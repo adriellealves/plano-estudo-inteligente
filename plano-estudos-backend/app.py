@@ -16,13 +16,24 @@ else:
     # Se estiver rodando como um script normal
     base_path = os.path.dirname(os.path.abspath(__file__))
 
-# Define os caminhos dos arquivos com base no caminho base
+# Os arquivos de dados devem estar NO MESMO DIRETÓRIO do executável ou script.
 DB_FILE = os.path.join(base_path, 'data.db')
-# Certifique-se de que o nome do arquivo Excel corresponde exatamente ao seu
-EXCEL_FILE = os.path.join(base_path, 'Planilha TCU - Auditor - Acompanhamento.xlsx') 
-frontend_folder = os.path.join(base_path, '..', 'dist')
+EXCEL_FILE = os.path.join(base_path, 'Planilha TCU - Auditor - Acompanhamento.xlsx')
+frontend_folder = os.path.join(base_path, 'dist') # Pasta do frontend
+
+# --- BLOCO DE DEPURAÇÃO ADICIONADO ---
+print("--- INICIANDO DEPURAÇÃO DE CAMINHOS ---")
+print(f"O script está rodando como executável? {getattr(sys, 'frozen', False)}")
+print(f"Caminho Base (base_path) = {base_path}")
+print(f"Caminho do Frontend (frontend_folder) = {frontend_folder}")
+index_html_path = os.path.join(frontend_folder, 'index.html')
+print(f"Caminho esperado para o index.html = {index_html_path}")
+print(f"O arquivo index.html existe nesse caminho? {os.path.exists(index_html_path)}")
+print("--- FIM DA DEPURAÇÃO ---")
+# --- FIM DO BLOCO DE DEPURAÇÃO ---
 
 app = Flask(__name__, static_folder=frontend_folder)
+# CORS não é estritamente necessário nesta configuração, mas é bom manter
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # --- Gerenciamento da Conexão ---
