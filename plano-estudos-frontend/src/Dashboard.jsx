@@ -29,7 +29,7 @@ export function Dashboard({ keyProp }) {
   if (error) return <div style={{ color: 'red' }}>Erro no Dashboard: {String(error)}</div>;
 
   return (
-    <div className="grid-container grid-container-lg-2-cols">
+    <div className="grid-container grid-container-lg-2-cols dashboard">
       <Card title="Horas por Disciplina" icon={<Timer />}>
         <div className="chart-container"><ResponsiveContainer width="100%" height="100%"><BarChart data={hoursData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" hide /><YAxis /> <Tooltip /> <Legend /><Bar dataKey="Horas" fill="#3b82f6" /></BarChart></ResponsiveContainer></div>
       </Card>

@@ -58,12 +58,12 @@ export function AddResultCard({ onDataChange }) {
           </Select>
         </div>
 
-        <div className="form-group">
+        <div className="form-group questions-input">
           <label>Acertos</label>
           <Input type="number" value={correct} onChange={(e) => setCorrect(e.target.value)} placeholder="Ex: 25" />
         </div>
         
-        <div className="form-group">
+        <div className="form-group questions-input">
           <label>Total de Questões</label>
           <Input type="number" value={total} onChange={(e) => setTotal(e.target.value)} placeholder="Ex: 30" />
         </div>

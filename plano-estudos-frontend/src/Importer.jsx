@@ -22,11 +22,9 @@ export function Importer({ onSync }) {
   };
 
   return (
-    <Card title="Sincronização" icon={<UploadCloud />}>
       <div className="importer-controls">
         <Button onClick={doImport} disabled={busy}><UploadCloud />Sincronizar com Planilha</Button>
+        {msg && <p className="sync-message">{msg}</p>}
       </div>
-       {msg && <p className="sync-message">{msg}</p>}
-    </Card>
   );
 }

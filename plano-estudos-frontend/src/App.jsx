@@ -56,7 +56,6 @@ export default function App() {
     { id: "trilhas", label: "Trilhas", icon: <GitMerge /> },
     { id: "tasks", label: "Tarefas", icon: <ListChecks /> },
     { id: "timer", label: "Sessões", icon: <Timer /> },
-    { id: "reviews", label: "Revisões", icon: <CalendarClock /> },
     { id: "manage", label: "Gerenciar", icon: <Edit /> },
   ];
 
@@ -66,22 +65,25 @@ export default function App() {
         <div className="header-content">
             <div className="header-title">
                 <span className={`logo-icon ${session ? 'timer-active-glow' : ''}`}><Timer /></span>
-                <h1 className="app-title">Plano de Estudos Inteligente</h1>
+                <h1 className="app-title">Plano de Estudos Auditor TCU</h1>
             </div>
-            <nav className="header-nav">
+            <div className="header-actions">
+              <nav className="header-nav">
                 {tabs.map(t => (
                     <Button key={t.id} variant={tab === t.id ? "primary" : "ghost"} onClick={() => setTab(t.id)}>{t.icon}{t.label}</Button>
                 ))}
             </nav>
+            <Importer onSync={handleSync} />
+            </div>
         </div>
+       
       </header>
       <main className="main-content">
-        <Importer onSync={handleSync} />
+        
         {tab === "dashboard" && <Dashboard key={refreshKey} />}
         {tab === "trilhas" && <TrailsPage key={refreshKey} onEditTask={(task) => handleOpenModal('task', task)} />}
         {tab === "tasks" && <Tasks key={refreshKey} onEditTask={(task) => handleOpenModal('task', task)} onDataChange={handleSync} />}
         {tab === "timer" && <TimerPage key={refreshKey} />}
-        {tab === "reviews" && <Reviews key={refreshKey} />}
         {tab === "manage" && <ManagePage key={refreshKey} onOpenModal={handleOpenModal} />}
       </main>
       <footer className="footer">API Conectada</footer>

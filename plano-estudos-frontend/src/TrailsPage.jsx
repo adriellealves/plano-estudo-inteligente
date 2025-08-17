@@ -94,20 +94,20 @@ export function TrailsPage({ keyProp, onEditTask, onTimerToggle, activeSession }
   }
 
   return (
-    <div className="grid-container trilhas-grid">
+    <><br /><div className="grid-container trilhas-grid">
       {trilhas.map(trilha => (
-        <Card 
-          key={trilha.id} 
-          title={trilha.name} 
+        <Card
+          key={trilha.id}
+          title={trilha.name}
           icon={<GitMerge />}
-          action={ <span className={`status-badge status-${trilha.status.toLowerCase()}`}>{trilha.status}</span> }
+          action={<span className={`status-badge status-${trilha.status.toLowerCase()}`}>{trilha.status}</span>}
         >
-          <p style={{minHeight: '40px'}}>Verifique o andamento das tarefas desta trilha.</p>
+          <p style={{ minHeight: '40px' }}>Verifique o andamento das tarefas desta trilha.</p>
           <div className="card-footer">
             <Button onClick={() => handleSelectTrilha(trilha)}>Ver Tarefas</Button>
           </div>
         </Card>
       ))}
-    </div>
+    </div></>
   );
 }

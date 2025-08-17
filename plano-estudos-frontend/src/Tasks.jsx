@@ -51,17 +51,19 @@ export function Tasks({ keyProp, onEditTask, onDataChange, onTimerToggle, active
   if (loading) return <div style={{ padding: '1rem' }}>Carregando Tarefas...</div>;
 
   return (
-    <div className="flex-container-col">
-      <AddResultCard onDataChange={onDataChange} />
-      <Card title="Filtrar Tarefas" icon={<ListChecks />}>
-        <div className="filter-container" style={{gridTemplateColumns: '200px auto'}}>
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} >
-            <option value="Pendente">Pendentes</option>
-            <option value="Concluída">Concluídas</option>
-          </Select>
-          <Button variant="ghost" onClick={loadTasks}><RefreshCw />Atualizar</Button>
-        </div>
-      </Card>
+    <div className="flex-container-col ">
+      <div className="flex-container tasks-header">
+        <AddResultCard onDataChange={onDataChange} />
+        <Card title="Filtrar Tarefas" icon={<ListChecks />}>
+          <div className="filter-container" style={{gridTemplateColumns: '200px auto'}}>
+            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} >
+              <option value="Pendente">Pendentes</option>
+              <option value="Concluída">Concluídas</option>
+            </Select>
+            <Button variant="ghost" onClick={loadTasks}><RefreshCw />Atualizar</Button>
+          </div>
+        </Card>
+      </div>
       <div className="grid-container tasks-grid">
         <AnimatePresence>
           {tasks.map(t => (
