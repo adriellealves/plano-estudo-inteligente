@@ -1,0 +1,11 @@
+# Arquivos gerados pelo PyInstaller
+/dist/
+/build/
+PlanoDeEstudos.spec
+
+# Arquivo do banco de dados
+data.db
+
+# Outros arquivos do Python
+__pycache__/
+*.pyc
