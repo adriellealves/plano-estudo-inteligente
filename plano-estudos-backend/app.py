@@ -1,17 +1,31 @@
 import sqlite3
 import pandas as pd
 import numpy as np
-from flask import Flask, jsonify, request, g
+from flask import Flask, jsonify, request, g, send_from_directory
 from datetime import datetime
 from flask_cors import CORS
+import os
+import sys
 
-# --- Configuração ---
-DB_FILE = 'data.db'
-EXCEL_FILE = 'Planilha TCU - Auditor - Acompanhamento.xlsx'
-app = Flask(__name__)
-CORS(app)
+# --- Bloco de Caminhos ---
+# Determina o caminho base, seja rodando como script ou como executável
+if getattr(sys, 'frozen', False):
+    # Se estiver rodando como um executável do PyInstaller
+    base_path = sys._MEIPASS
+else:
+    # Se estiver rodando como um script normal
+    base_path = os.path.dirname(os.path.abspath(__file__))
 
-# --- Gerenciamento da Conexão com o Banco de Dados ---
+# Define os caminhos dos arquivos com base no caminho base
+DB_FILE = os.path.join(base_path, 'data.db')
+# Certifique-se de que o nome do arquivo Excel corresponde exatamente ao seu
+EXCEL_FILE = os.path.join(base_path, 'Planilha TCU - Auditor - Acompanhamento.xlsx') 
+frontend_folder = os.path.join(base_path, '..', 'dist')
+
+app = Flask(__name__, static_folder=frontend_folder)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+# --- Gerenciamento da Conexão ---
 def get_db_connection():
     conn = getattr(g, '_database', None)
     if conn is None:
@@ -32,11 +46,9 @@ def close_connection(exception):
 def get_dashboard_summary():
     conn = get_db_connection()
     hours_by_discipline = conn.execute("""
-        SELECT d.name as discipline_name, SUM(s.duration_minutes) as total_minutes
-        FROM study_session s
-        JOIN task t ON s.task_id = t.id
-        JOIN discipline d ON t.discipline_id = d.id
-        WHERE s.duration_minutes IS NOT NULL
+        SELECT d.name as discipline_name, SUM(e.total_minutos_estudados) as total_minutes
+        FROM evolution e
+        JOIN discipline d ON e.discipline_id = d.id
         GROUP BY d.name
     """).fetchall()
     avg_percent_by_discipline = conn.execute("""
@@ -49,32 +61,24 @@ def get_dashboard_summary():
         "avg_percent_by_discipline": [dict(row) for row in avg_percent_by_discipline],
     })
 
-# --- NOVOS ENDPOINTS PARA AS TRILHAS ---
-
 @app.route('/api/trilhas', methods=['GET'])
 def get_all_trilhas():
-    """Busca todas as trilhas e calcula o status de conclusão de cada uma."""
     conn = get_db_connection()
     trilhas = conn.execute('SELECT * FROM trilha ORDER BY id').fetchall()
     trilhas_list = []
     for trilha in trilhas:
         trilha_dict = dict(trilha)
-        # Verifica se ainda existem tarefas pendentes para esta trilha
         pending_tasks = conn.execute(
             "SELECT COUNT(id) as count FROM task WHERE trilha_id = ? AND status = 'Pendente'",
             (trilha_dict['id'],)
         ).fetchone()
-        
         trilha_dict['status'] = 'Concluída' if pending_tasks['count'] == 0 else 'Pendente'
         trilhas_list.append(trilha_dict)
-        
     return jsonify(trilhas_list)
 
 @app.route('/api/trilhas/<int:trilha_id>/tasks', methods=['GET'])
 def get_tasks_for_trilha(trilha_id):
-    """Busca todas as tarefas de uma trilha específica."""
     conn = get_db_connection()
-    # Usa a função já existente de buscar tarefas, mas filtrada pela trilha
     tasks_rows = conn.execute("SELECT * FROM task WHERE trilha_id = ? ORDER BY id ASC", (trilha_id,)).fetchall()
     tasks_list = []
     for row in tasks_rows:
@@ -84,7 +88,6 @@ def get_tasks_for_trilha(trilha_id):
         tasks_list.append(task_dict)
     return jsonify(tasks_list)
 
-# --- CRUD de Disciplinas ---
 @app.route('/api/disciplines', methods=['GET', 'POST'])
 def handle_disciplines():
     conn = get_db_connection()
@@ -122,9 +125,14 @@ def handle_discipline(discipline_id):
         conn.commit()
         return jsonify({"message": "Disciplina e todos os dados associados foram deletados"})
 
-# --- CRUD de Tópicos ---
+@app.route('/api/topics', methods=['GET'])
+def get_all_topics():
+    conn = get_db_connection()
+    topics = conn.execute('SELECT * FROM topic ORDER BY name').fetchall()
+    return jsonify([dict(t) for t in topics])
+
 @app.route('/api/disciplines/<int:discipline_id>/topics', methods=['GET', 'POST'])
-def handle_topics(discipline_id):
+def handle_topics_by_discipline(discipline_id):
     conn = get_db_connection()
     if request.method == 'GET':
         topics = conn.execute('SELECT * FROM topic WHERE discipline_id = ? ORDER BY name', (discipline_id,)).fetchall()
@@ -154,28 +162,20 @@ def handle_topic(topic_id):
         conn.commit()
         return jsonify({"message": "Tópico deletado"})
 
-# --- CRUD de Tarefas ---
 @app.route('/api/tasks', methods=['GET', 'POST'])
 def handle_tasks():
     conn = get_db_connection()
     if request.method == 'GET':
         status = request.args.get('status')
-        
         query = "SELECT * FROM task"
         params = []
-        
         if status:
             query += " WHERE status = ?"
             params.append(status)
-        
-        # --- LÓGICA DE ORDENAÇÃO CORRIGIDA ---
         if status == 'Pendente':
-            # Se pedir tarefas pendentes, ordena em ordem crescente pelo ID
             query += " ORDER BY id ASC"
         else:
-            # Para outros casos (Concluídas, etc.), mantém a ordem decrescente (mais recentes primeiro)
             query += " ORDER BY completion_date DESC, id DESC"
-        
         tasks_rows = conn.execute(query, params).fetchall()
         tasks_list = []
         for row in tasks_rows:
@@ -197,30 +197,31 @@ def handle_tasks():
         new_task = conn.execute('SELECT * FROM task WHERE id = ?', (task_id,)).fetchone()
         return jsonify(dict(new_task)), 201
 
-# Em app.py, substitua toda a função handle_task por esta:
-
 @app.route('/api/tasks/<int:task_id>', methods=['GET', 'PUT', 'DELETE'])
 def handle_task(task_id):
     conn = get_db_connection()
-    
-    # Lógica para GET (buscar uma tarefa)
     if request.method == 'GET':
         task = conn.execute('SELECT * FROM task WHERE id = ?', (task_id,)).fetchone()
-        if not task:
-            return jsonify({"error": "Tarefa não encontrada"}), 404
-        
+        if not task: return jsonify({"error": "Tarefa não encontrada"}), 404
         task_dict = dict(task)
         topics = conn.execute("SELECT t.id, t.name FROM topic t JOIN task_topics tt ON t.id = tt.topic_id WHERE tt.task_id = ?", (task_id,)).fetchall()
         task_dict['topics'] = [dict(t) for t in topics]
         return jsonify(task_dict)
-
-    # Lógica para PUT (atualizar uma tarefa)
     if request.method == 'PUT':
         data = request.get_json()
         cursor = conn.cursor()
+        carga_realizada_minutos = data.get('carga_horaria_realizada_minutos')
         
-        cursor.execute("UPDATE task SET title = ?, discipline_id = ?, completion_date = ?, status = ? WHERE id = ?",
-                       (data['title'], data['discipline_id'], data.get('completion_date'), data.get('status'), task_id))
+        current_task = conn.execute('SELECT status FROM task WHERE id = ?', (task_id,)).fetchone()
+        if data.get('status') == 'Concluída' and current_task and current_task['status'] != 'Concluída':
+            sum_result = conn.execute("SELECT SUM(duration_minutes) as total FROM study_session WHERE task_id = ?", (task_id,)).fetchone()
+            if sum_result and sum_result['total'] is not None:
+                carga_realizada_minutos = sum_result['total']
+
+        cursor.execute("""
+            UPDATE task SET title = ?, discipline_id = ?, completion_date = ?, status = ?, carga_horaria_realizada_minutos = ?
+            WHERE id = ?
+        """, (data['title'], data['discipline_id'], data.get('completion_date'), data.get('status'), carga_realizada_minutos, task_id))
         
         cursor.execute("DELETE FROM task_topics WHERE task_id = ?", (task_id,))
         if data.get('topic_ids'):
@@ -228,71 +229,35 @@ def handle_task(task_id):
                 cursor.execute("INSERT INTO task_topics (task_id, topic_id) VALUES (?, ?)", (task_id, topic_id))
         
         conn.commit()
+        recalculate_evolution(conn)
         
-        # --- CORREÇÃO APLICADA AQUI ---
-        # Em vez de chamar a função novamente, buscamos os dados atualizados e retornamos.
-        updated_task = conn.execute('SELECT * FROM task WHERE id = ?', (task_id,)).fetchone()
-        if not updated_task:
-            return jsonify({"error": "Tarefa não encontrada após atualização"}), 404
-            
-        updated_task_dict = dict(updated_task)
-        updated_topics = conn.execute("SELECT t.id, t.name FROM topic t JOIN task_topics tt ON t.id = tt.topic_id WHERE tt.task_id = ?", (task_id,)).fetchall()
-        updated_task_dict['topics'] = [dict(t) for t in updated_topics]
-        
-        return jsonify(updated_task_dict)
-        # --- FIM DA CORREÇÃO ---
+        return handle_task(task_id)
 
-    # Lógica para DELETE (deletar uma tarefa)
     if request.method == 'DELETE':
         conn.execute('DELETE FROM task WHERE id = ?', (task_id,))
         conn.commit()
         return jsonify({"message": "Tarefa deletada"})
 
-# --- Endpoints de Sessões, Resultados, Revisões ---
-
 @app.route('/api/sessions/save', methods=['POST'])
 def save_session():
-    """Recebe uma sessão de estudo completa e a salva no banco."""
     data = request.get_json()
     conn = get_db_connection()
-    
-    # Pega os dados enviados pelo frontend
-    task_id = data.get('task_id')
-    start_time_iso = data.get('start')
-    end_time_iso = data.get('end')
-    duration_minutes = data.get('duration_minutes')
-
-    # Insere a linha completa no banco de dados
     cursor = conn.cursor()
-    cursor.execute(
-        'INSERT INTO study_session (task_id, start, "end", duration_minutes) VALUES (?, ?, ?, ?)',
-        (task_id, start_time_iso, end_time_iso, duration_minutes)
-    )
+    cursor.execute('INSERT INTO study_session (task_id, start, "end", duration_minutes) VALUES (?, ?, ?, ?)',
+                   (data.get('task_id'), data.get('start'), data.get('end'), data.get('duration_minutes')))
     conn.commit()
-    
-    # Opcional: recalcular a evolução após salvar uma sessão de estudo
     recalculate_evolution(conn)
-    
     return jsonify({"message": "Sessão salva com sucesso", "id": cursor.lastrowid}), 201
 
 @app.route('/api/sessions/history', methods=['GET'])
 def get_session_history():
-    """Busca as últimas 20 sessões de estudo salvas."""
     conn = get_db_connection()
     history = conn.execute("""
-        SELECT 
-            s.id,
-            s.start,
-            s."end",
-            s.duration_minutes,
-            t.title as task_title,
-            d.name as discipline_name
+        SELECT s.id, s.start, s."end", s.duration_minutes, t.title as task_title, d.name as discipline_name
         FROM study_session s
         LEFT JOIN task t ON s.task_id = t.id
         LEFT JOIN discipline d ON t.discipline_id = d.id
-        WHERE s."end" IS NOT NULL
-        ORDER BY s.start DESC
-        LIMIT 20
+        WHERE s."end" IS NOT NULL ORDER BY s.start DESC LIMIT 20
     """).fetchall()
     return jsonify([dict(row) for row in history])
 
@@ -305,10 +270,7 @@ def add_result():
     cursor.execute('INSERT INTO result (task_id, correct, total, percent, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)',
                    (data.get('task_id'), data['correct'], data['total'], percent))
     conn.commit()
-    
-    # ADIÇÃO IMPORTANTE: Recalcula a evolução logo após salvar um resultado
     recalculate_evolution(conn)
-    
     return jsonify({"message": "Resultado salvo", "percent": percent})
 
 @app.route('/api/reviews', methods=['GET'])
@@ -316,7 +278,7 @@ def get_reviews():
     date_from = request.args.get('from')
     date_to = request.args.get('to')
     conn = get_db_connection()
-    query = "SELECT r.*, d.name as discipline_name, t.title as task_title FROM review r JOIN task t ON r.task_id = t.id JOIN discipline d ON t.discipline_id = d.id"
+    query = "SELECT r.*, d.name as discipline_name, t.title as task_title FROM review r LEFT JOIN task t ON r.task_id = t.id LEFT JOIN discipline d ON t.discipline_id = d.id"
     params = []
     conditions = []
     if date_from:
@@ -331,7 +293,6 @@ def get_reviews():
     reviews = conn.execute(query, params).fetchall()
     return jsonify([dict(row) for row in reviews])
 
-# --- Endpoints de Sincronização e Evolução ---
 @app.route('/api/evolution', methods=['GET'])
 def get_evolution():
     conn = get_db_connection()
@@ -342,13 +303,19 @@ def get_evolution():
 def sync_from_spreadsheet():
     try:
         conn = get_db_connection()
+        print(f"Tentando importar do arquivo: {EXCEL_FILE}")
+        if not os.path.exists(EXCEL_FILE):
+            return jsonify({"error": f"Arquivo não encontrado em: {EXCEL_FILE}"}), 404
         import_disciplines_from_excel(conn)
         import_ciclo_from_excel(conn)
         recalculate_evolution(conn)
         return jsonify({"message": "Sincronização concluída!"})
-    except Exception as e: return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
-# --- Funções Auxiliares (Lógica de Banco e Importação) ---
+# --- Funções Auxiliares ---
 
 def create_tables(conn):
     cursor = conn.cursor()
@@ -360,6 +327,7 @@ def create_tables(conn):
     CREATE TABLE IF NOT EXISTS task (
         id INTEGER PRIMARY KEY, spreadsheet_task_id REAL UNIQUE, title TEXT, discipline_id INTEGER,
         trilha_id INTEGER, completion_date DATE, status TEXT, carga_horaria_planejada_minutos INTEGER,
+        carga_horaria_realizada_minutos INTEGER,
         FOREIGN KEY (discipline_id) REFERENCES discipline (id) ON DELETE CASCADE, FOREIGN KEY (trilha_id) REFERENCES trilha (id)
     )""")
     cursor.execute("""
@@ -373,12 +341,8 @@ def create_tables(conn):
                    total INTEGER, percent REAL, created_at DATETIME NOT NULL, FOREIGN KEY (task_id) REFERENCES task (id) ON DELETE CASCADE)""")
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS evolution (
-        id INTEGER PRIMARY KEY,
-        discipline_id INTEGER NOT NULL,
-        qtd_tarefas INTEGER,
-        qtd_exercicios_feitos INTEGER,
-        total_acertos INTEGER,
-        desempenho_medio REAL,
+        id INTEGER PRIMARY KEY, discipline_id INTEGER NOT NULL, qtd_tarefas INTEGER,
+        qtd_exercicios_feitos INTEGER, total_acertos INTEGER, desempenho_medio REAL,
         total_minutos_estudados INTEGER,
         FOREIGN KEY (discipline_id) REFERENCES discipline (id) ON DELETE CASCADE
     )""")
@@ -417,36 +381,31 @@ def import_ciclo_from_excel(conn):
         if pd.isna(task_id_raw): continue
         try: task_id_sheet = float(task_id_raw)
         except: continue
-        
         task_date_str = row.get('DATA')
         status = 'Pendente'
         completion_date = None
         if pd.notna(task_date_str):
             status = 'Concluída'
             completion_date = pd.to_datetime(task_date_str, errors='coerce').strftime('%Y-%m-%d')
-        
         trilha_name = row.get('TRILHA'); trilha_id = None
         if pd.notna(trilha_name):
             cursor.execute("INSERT OR IGNORE INTO trilha (name) VALUES (?)", (str(trilha_name),))
             trilha_id = cursor.execute("SELECT id FROM trilha WHERE name = ?", (str(trilha_name),)).fetchone()[0]
-        
         disc_name = row.get('DISCIPLINA'); disc_id = None
         if pd.notna(disc_name):
             disc_id_res = cursor.execute("SELECT id FROM discipline WHERE name = ?", (disc_name,)).fetchone()
             if not disc_id_res: continue
             disc_id = disc_id_res[0]
         else: continue
-        
-        cursor.execute("""INSERT OR IGNORE INTO task (spreadsheet_task_id, title, discipline_id, trilha_id, completion_date, carga_horaria_planejada_minutos, status)
-                          VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                       (task_id_sheet, row.get('TAREFAS'), disc_id, trilha_id, completion_date, convert_time_to_minutes(row.get('CH')), status))
-        
+        ch_efetiva_min = convert_time_to_minutes(row.get('CH (EFETIVA)'))
+        cursor.execute("""INSERT OR IGNORE INTO task (spreadsheet_task_id, title, discipline_id, trilha_id, completion_date, 
+                          carga_horaria_planejada_minutos, carga_horaria_realizada_minutos, status)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                       (task_id_sheet, row.get('TAREFAS'), disc_id, trilha_id, completion_date, 
+                        convert_time_to_minutes(row.get('CH')), ch_efetiva_min, status))
         if cursor.rowcount > 0:
             added += 1
             task_id_db = cursor.lastrowid
-            ch_eff = convert_time_to_minutes(row.get('CH (EFETIVA)'))
-            if ch_eff > 0: cursor.execute("INSERT INTO study_session (task_id, duration_minutes, start) VALUES (?, ?, ?)", (task_id_db, ch_eff, datetime.now()))
-            
             q_total, q_correct = row.get('TOTAL QUESTÕES', 0), row.get('TOTAL ACERTOS', 0)
             if pd.notna(q_total) and q_total > 0:
                 percent = (q_correct / q_total) * 100 if q_total > 0 else 0
@@ -455,12 +414,20 @@ def import_ciclo_from_excel(conn):
     conn.commit()
     print(f"✔️ {added} novas tarefas adicionadas.")
 
-
 def recalculate_evolution(conn):
+    print("⏳ Iniciando recálculo da tabela de evolução...")
     tasks_results_query = "SELECT t.discipline_id, d.name as discipline_name, r.total, r.correct FROM task t JOIN discipline d ON t.discipline_id = d.id LEFT JOIN result r ON t.id = r.task_id"
     df_tasks = pd.read_sql_query(tasks_results_query, conn)
-    study_session_query = "SELECT t.discipline_id, s.duration_minutes FROM study_session s JOIN task t ON s.task_id = t.id"
-    df_sessions = pd.read_sql_query(study_session_query, conn)
+    study_time_query = """
+        SELECT discipline_id, SUM(total_minutes) as total_minutos_estudados
+        FROM (
+            SELECT discipline_id, carga_horaria_realizada_minutos as total_minutes FROM task WHERE carga_horaria_realizada_minutos IS NOT NULL
+            UNION ALL
+            SELECT t.discipline_id, s.duration_minutes as total_minutes FROM study_session s JOIN task t ON s.task_id = t.id WHERE s.duration_minutes IS NOT NULL
+        )
+        GROUP BY discipline_id
+    """
+    df_study_time = pd.read_sql_query(study_time_query, conn)
     if df_tasks.empty:
         print("⚠️ Não há dados de tarefas para calcular a evolução.")
         return
@@ -468,20 +435,29 @@ def recalculate_evolution(conn):
     evo_data = df_tasks.groupby(['discipline_id', 'discipline_name']).agg(
         qtd_tarefas=('discipline_id', 'size'), qtd_exercicios_feitos=('total', 'sum'), total_acertos=('correct', 'sum')).reset_index()
     evo_data['desempenho_medio'] = np.where(evo_data['qtd_exercicios_feitos'] > 0, (evo_data['total_acertos'] / evo_data['qtd_exercicios_feitos']) * 100, 0)
-    if not df_sessions.empty:
-        session_data = df_sessions.groupby('discipline_id').agg(total_minutos_estudados=('duration_minutes', 'sum')).reset_index()
-        evo_data = pd.merge(evo_data, session_data, on='discipline_id', how='left')
+    if not df_study_time.empty:
+        evo_data = pd.merge(evo_data, df_study_time, on='discipline_id', how='left')
     else:
         evo_data['total_minutos_estudados'] = 0
     evo_data.fillna(0, inplace=True)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM evolution")
     for i, row in evo_data.iterrows():
-        cursor.execute("INSERT INTO evolution (discipline_id, qtd_tarefas, qtd_exercicios_feitos, total_acertos, desempenho_medio, total_minutos_estudados) VALUES (?, ?, ?, ?, ?, ?)",
-                       (row['discipline_id'], int(row['qtd_tarefas']), int(row['qtd_exercicios_feitos']), int(row['total_acertos']), row['desempenho_medio'], int(row['total_minutos_estudados'])))
+        cursor.execute("""
+        INSERT INTO evolution (discipline_id, qtd_tarefas, qtd_exercicios_feitos, total_acertos, desempenho_medio, total_minutos_estudados)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (row['discipline_id'], int(row['qtd_tarefas']), int(row['qtd_exercicios_feitos']), int(row['total_acertos']), row['desempenho_medio'], int(row['total_minutos_estudados'])))
     conn.commit()
     print("✔️ Tabela de evolução atualizada.")
 
+# --- Servindo o Frontend ---
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve(path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, 'index.html')
 
 # --- Inicialização ---
 with app.app_context():
