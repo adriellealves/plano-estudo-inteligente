@@ -1,0 +1,533 @@
+/* Estilos Globais */
+:root {
+  --background-color: #f9fafb;
+  --text-color: #1f2937;
+  --card-background: #ffffff;
+  --border-color: #e5e7eb;
+  --primary-color: #3b82f6;
+  --primary-text: #ffffff;
+  --muted-text: #6b7280;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Layout Principal */
+.app-container {
+  min-height: 100vh;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(4px);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.header-content, .main-content, .footer {
+  max-width: 1152px; /* Equivalente a max-w-6xl */
+  margin-left: auto;
+  margin-right: auto;
+  padding: 1rem;
+}
+
+.main-content {
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
+.footer {
+  padding-bottom: 2.5rem;
+  font-size: 0.75rem;
+  color: var(--muted-text);
+}
+
+/* Componentes de UI */
+
+.card {
+  background-color: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+  
+  display: flex;
+  flex-direction: column;
+  height: 100%; 
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start; 
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  gap: 0.5rem; 
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.card-body {
+  flex-grow: 1;
+}
+
+.card-footer {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end; 
+  gap: 0.5rem;
+}
+
+.button {
+  padding: 0.5rem 1rem;
+  border-radius: 1rem; /* rounded-2xl */
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.button:hover {
+  opacity: 0.9;
+}
+
+.button-primary {
+  background-color: var(--primary-color);
+  color: var(--primary-text);
+}
+
+.button-ghost {
+  background-color: transparent;
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+}
+
+/* Layout de Grid */
+.grid-container {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .grid-container-lg-2-cols {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Estilo para o contêiner do gráfico */
+.chart-container {
+    height: 256px; /* h-64 */
+    position: relative;
+}
+
+/* Estilos para a página de Tarefas */
+.flex-container-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.tasks-grid {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+.task-details {
+  font-size: 0.875rem;
+  color: var(--muted-text);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* Estilos para a página de Cronômetro */
+.timer-card {
+  max-width: 500px;
+  margin: 0 auto;
+}
+.timer-display {
+  font-size: 3rem; /* text-5xl */
+  font-weight: 700;
+  letter-spacing: 0.025em; /* tracking-wider */
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+.timer-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Estilos para a página de Importação */
+.importer-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+.sync-message {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--muted-text);
+}
+
+/* Componentes de formulário */
+.select, .input {
+  width: 100%;
+  border-radius: 0.75rem; /* rounded-xl */
+  border: 1px solid var(--border-color);
+  background-color: var(--card-background);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+/* Estilos para ícones dentro de elementos */
+.w-5, .h-5 {
+  width: 20px;
+  height: 20px;
+}
+.w-4, .h-4 {
+  width: 16px;
+  height: 16px;
+}
+.logo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 1rem;
+  background-color: var(--primary-color);
+  color: white;
+}
+.app-title {
+  font-weight: 600;
+}
+
+.flex-container-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.tasks-grid {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+.task-details {
+  font-size: 0.875rem;
+  color: var(--muted-text);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.importer-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+.sync-message {
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--muted-text);
+}
+.select, .input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-color);
+  background-color: var(--card-background);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+.logo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 1rem;
+  background-color: var(--primary-color);
+  color: white;
+}
+.app-title {
+  font-weight: 600;
+}
+
+/* Estilos para a página de Revisão */
+.filter-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+/* Estilos para a página de Gerenciamento */
+.management-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.management-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.2s;
+}
+.management-list li:hover {
+  background-color: #f3f4f6;
+}
+.management-list li div {
+  display: flex;
+  gap: 0.25rem;
+}
+
+/* Estilos para o Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+.form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.button.button-danger {
+  background-color: #dc2626;
+  color: white;
+}
+
+
+.flex-container-col { display: flex; flex-direction: column; gap: 1rem; }
+.tasks-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.task-details { font-size: 0.875rem; color: var(--muted-text); display: flex; flex-direction: column; gap: 0.25rem; }
+.importer-controls { display: flex; gap: 0.5rem; align-items: flex-end; }
+.sync-message { margin-top: 0.75rem; font-size: 0.875rem; color: var(--muted-text); }
+.select, .input { width: 100%; border-radius: 0.75rem; border: 1px solid var(--border-color); background-color: var(--card-background); padding: 0.5rem 0.75rem; font-size: 0.875rem; }
+.logo-icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 1rem; background-color: var(--primary-color); color: white; }
+.app-title { font-weight: 600; }
+.filter-container { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.75rem; align-items: flex-end; }
+.management-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.management-list li { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; border-radius: 0.5rem; transition: background-color 0.2s; }
+.management-list li:hover { background-color: #f3f4f6; }
+.management-list li div { display: flex; gap: 0.25rem; }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal-content { background: white; padding: 1.5rem; border-radius: 1rem; width: 90%; max-width: 500px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.modal-header h3 { margin: 0; font-size: 1.25rem; }
+.modal-close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; }
+.form-container { display: flex; flex-direction: column; gap: 1rem; }
+.form-container label { font-weight: 500; font-size: 0.875rem; }
+.form-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
+.button.button-danger { background-color: #dc2626; color: white; }
+.topic-discipline { color: var(--muted-text); font-size: 0.8rem; }
+
+/* Estilos para o formulário de resultados */
+.result-form-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.form-group label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--muted-text);
+}
+
+.form-group .button {
+  width: 100%;
+  justify-content: center;
+}
+/* Adicione estas classes no final do seu arquivo src/App.css */
+
+/* Estilos para a lista de Trilhas */
+.trilhas-grid {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+.status-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  color: white;
+}
+.status-concluída {
+  background-color: #10b981; /* Verde */
+}
+.status-pendente {
+  background-color: #f59e0b; /* Amarelo */
+}
+
+/* Estilos para o timer dentro do card */
+.timer-in-card {
+  border-top: 1px solid var(--border-color);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+.timer-compact {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.timer-compact .button {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+/* Novo Componente TaskCard */
+
+.task-card {
+  border: 1px solid var(--border-color);
+  background-color: var(--card-background);
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.task-card-header {
+  padding: 0.75rem 1rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.task-card-header-title {
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.task-card-header-id {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted-text);
+  display: block;
+}
+
+.task-card-body {
+  padding: 1rem;
+  flex-grow: 1;
+  display: grid;
+  /* ALTERAÇÃO AQUI: Detalhes 1fr (esquerda), Conteúdo principal 2fr (direita) */
+  grid-template-columns: 1fr 2fr; 
+  gap: 1rem;
+}
+
+.task-card-details {
+  font-size: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  /* ALTERAÇÃO AQUI: Borda agora é na direita */
+  border-right: 1px solid var(--border-color);
+  padding-right: 1rem;
+}
+
+.task-card-footer {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-start;
+}
+
+/* Adicione estas classes no final do seu src/App.css */
+
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.history-list li {
+  padding: 0.75rem;
+  background-color: #f9fafb; /* bg-zinc-50 */
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
+}
+.history-item-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
+}
+.history-item-duration {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--primary-color);
+}
+.history-item-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--muted-text);
+  margin-top: 0.25rem;
+}
