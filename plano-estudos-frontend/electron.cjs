@@ -16,11 +16,22 @@ function createPythonProcess() {
   // --- MODO DE PRODUÇÃO ---
   // O caminho para os 'extraResources' onde o backend foi empacotado
   const resourcesPath = process.resourcesPath;
-  const backendPath = path.join(resourcesPath, 'backend');
+  const backendPath = path.join(resourcesPath, 'backend','dist');
 
   // Determina o nome do executável baseado no sistema operacional
   const executableName = process.platform === 'win32' ? 'app.exe' : 'app';
   const scriptPath = path.join(backendPath, executableName);
+
+  // Caminho do banco de dados
+  const dbPath = path.join(backendPath, 'data.db');
+  console.log(`Caminho do banco de dados: ${dbPath}`);
+
+  // Verifica se o banco existe
+  if (!fs.existsSync(dbPath)) {
+    console.log("Banco de dados não encontrado, criando novo...");
+    // Cria arquivo vazio
+    fs.writeFileSync(dbPath, '');
+  }
   
   console.log(`Iniciando backend de produção em: ${scriptPath}`);
 
@@ -28,6 +39,7 @@ function createPythonProcess() {
 
   pythonProcess.stdout.on('data', (data) => console.log(`Backend Prod: ${data}`));
   pythonProcess.stderr.on('data', (data) => console.error(`Backend Prod Error: ${data}`));
+
 }
 
 function createWindow() {

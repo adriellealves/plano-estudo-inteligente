@@ -15,6 +15,7 @@ if getattr(sys, 'frozen', False):
     base_path = sys._MEIPASS
     # Em produção, o frontend (pasta 'dist') é empacotado junto ao executável
     frontend_folder = os.path.join(base_path, 'dist')
+    spreadsheet_path = os.path.join(base_path, 'backend', 'Planilha TCU - Auditor - Acompanhamento.xlsx')
 else:
     # Se estiver rodando como um script normal (MODO DESENVOLVIMENTO)
     # O base_path é o diretório do script app.py (.../plano-estudos-backend)
@@ -48,7 +49,10 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # --- Gerenciamento da Conexão ---
 def get_db_connection():
-    db_file = os.path.join(base_path, 'data.db')
+    if getattr(sys, 'frozen', False):
+        db_file = os.path.join(sys._MEIPASS, 'backend', 'data.db')
+    else:
+        db_file = os.path.join(base_path, 'data.db')
     conn = getattr(g, '_database', None)
     if conn is None:
         conn = g._database = sqlite3.connect(db_file)
@@ -341,6 +345,7 @@ def sync_from_spreadsheet():
 # --- Funções Auxiliares ---
 
 def create_tables(conn):
+    print("✅ Verificando/Criando tabelas no banco de dados...")
     cursor = conn.cursor()
     cursor.execute("CREATE TABLE IF NOT EXISTS discipline (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)")
     cursor.execute("CREATE TABLE IF NOT EXISTS trilha (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)")

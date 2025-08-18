@@ -85,8 +85,21 @@ jobs:
 
       - name: Copiar backend para recursos do Electron
         run: |
-          New-Item -ItemType Directory -Force -Path plano-estudos-frontend\backend
-          Copy-Item -Path plano-estudos-backend\dist-ready\* -Destination plano-estudos-frontend\backend\ -Force
+          # Cria estrutura de pastas
+          New-Item -ItemType Directory -Force -Path plano-estudos-frontend\backend\dist
+          
+          # Copia executável mantendo nome original
+          Copy-Item -Path plano-estudos-backend\dist\app.exe -Destination plano-estudos-frontend\backend\dist\app.exe -Force
+          
+          # Copia planilha para o diretório principal do backend
+          Copy-Item -Path "plano-estudos-backend\Planilha TCU - Auditor - Acompanhamento.xlsx" -Destination plano-estudos-frontend\backend\ -Force
+          
+          # Cria banco de dados vazio se não existir
+          $dbPath = "plano-estudos-backend\data.db"
+          if (-not (Test-Path $dbPath)) {
+              New-Item -ItemType File -Path $dbPath
+          }
+          Copy-Item -Path $dbPath -Destination plano-estudos-frontend\backend\ -Force
         shell: pwsh
 
       - name: Build instalador Electron
