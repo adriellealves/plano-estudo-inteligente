@@ -92,7 +92,7 @@ jobs:
       - name: Build instalador Electron
         run: |
           cd plano-estudos-frontend
-          npm run dist
+          npm run dist -- --win
         shell: pwsh
 
       # --------------------------
