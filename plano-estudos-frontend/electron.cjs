@@ -19,7 +19,7 @@ function createPythonProcess() {
   const backendPath = path.join(resourcesPath, 'backend');
 
   // Determina o nome do executável baseado no sistema operacional
-  const executableName = process.platform === 'win64' ? 'app.exe' : 'app';
+  const executableName = process.platform === 'win32' ? 'app.exe' : 'app';
   const scriptPath = path.join(backendPath, executableName);
   
   console.log(`Iniciando backend de produção em: ${scriptPath}`);
