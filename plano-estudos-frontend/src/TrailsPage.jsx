@@ -94,7 +94,7 @@ export function TrailsPage({ keyProp, onEditTask, onTimerToggle, activeSession }
   }
 
   return (
-    <><br /><div className="grid-container trilhas-grid">
+   <div className="trilhas-grid">
       {trilhas.map(trilha => (
         <Card
           key={trilha.id}
@@ -108,6 +108,6 @@ export function TrailsPage({ keyProp, onEditTask, onTimerToggle, activeSession }
           </div>
         </Card>
       ))}
-    </div></>
+    </div>
   );
 }

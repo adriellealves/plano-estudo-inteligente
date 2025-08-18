@@ -1,11 +1,32 @@
-# Arquivos gerados pelo PyInstaller
-/dist/
-/build/
-PlanoDeEstudos.spec
 
-# Arquivo do banco de dados
-data.db
-
-# Outros arquivos do Python
+# ----------------------
+# Python / Backend
+# ----------------------
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+env/
+venv/
+dist/
+build/
+*.spec               # pyinstaller
+*.egg-info/
+data.db
+# Arquivos sensíveis / dados
+*.db                 # banco de dados
+*.env                # variáveis de ambiente
+*.xlsx               # planilhas locais se não quiser versionar
+*.pem
+*.key
+*.crt
+.env
+# IDEs / editores
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Sistema
+.DS_Store
+Thumbs.db

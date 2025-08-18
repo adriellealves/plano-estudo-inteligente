@@ -1,0 +1,71 @@
+name: Build Full App (Electron + Python Backend)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # permite rodar manualmente
+
+jobs:
+  build-app:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      # --------------------------
+      # Backend (PyInstaller)
+      # --------------------------
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependências do backend
+        run: |
+          cd plano-estudos-backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Gerar backend.exe
+        run: |
+          cd plano-estudos-backend
+          pyinstaller --onefile --noconsole app.py
+          mkdir dist-ready
+          copy dist\\app.exe dist-ready\\backend.exe
+          if exist data.db copy data.db dist-ready\\
+          if exist "Planilha TCU - Auditor - Acompanhamento.xlsx" copy "Planilha TCU - Auditor - Acompanhamento.xlsx" dist-ready\\
+
+      # --------------------------
+      # Frontend + Electron
+      # --------------------------
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar dependências do frontend
+        run: |
+          cd plano-estudos-frontend
+          npm install
+
+      - name: Copiar backend para recursos do Electron
+        run: |
+          mkdir plano-estudos-frontend\\backend
+          copy plano-estudos-backend\\dist-ready\\* plano-estudos-frontend\\backend\\
+
+      - name: Build instalador Electron
+        run: |
+          cd plano-estudos-frontend
+          npm run dist
+
+      # --------------------------
+      # Upload final
+      # --------------------------
+      - name: Upload instalador
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-installer
+          path: plano-estudos-frontend/release/*.exe

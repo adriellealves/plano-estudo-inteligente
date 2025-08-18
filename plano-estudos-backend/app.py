@@ -7,21 +7,31 @@ from flask_cors import CORS
 import os
 import sys
 
-# --- Bloco de Caminhos ---
+# --- Bloco de Caminhos Corrigido ---
 # Determina o caminho base, seja rodando como script ou como executável
 if getattr(sys, 'frozen', False):
-    # Se estiver rodando como um executável do PyInstaller
+    # Se estiver rodando como um executável do PyInstaller (MODO PRODUÇÃO)
+    # O base_path é uma pasta temporária _MEIPASS onde tudo é extraído
     base_path = sys._MEIPASS
+    # Em produção, o frontend (pasta 'dist') é empacotado junto ao executável
+    frontend_folder = os.path.join(base_path, 'dist')
 else:
-    # Se estiver rodando como um script normal
+    # Se estiver rodando como um script normal (MODO DESENVOLVIMENTO)
+    # O base_path é o diretório do script app.py (.../plano-estudos-backend)
     base_path = os.path.dirname(os.path.abspath(__file__))
+    
 
-# Os arquivos de dados devem estar NO MESMO DIRETÓRIO do executável ou script.
-DB_FILE = os.path.join(base_path, 'data.db')
-EXCEL_FILE = os.path.join(base_path, 'Planilha TCU - Auditor - Acompanhamento.xlsx')
-frontend_folder = os.path.join(base_path, 'dist') # Pasta do frontend
+    # Em desenvolvimento, a pasta 'dist' do frontend está em um caminho relativo diferente.
+    # A estrutura esperada é:
+    # .../
+    #    |- plano-estudos-backend/ (onde este script está)
+    #    |- plano-estudos-frontend/ (onde está a pasta 'dist' após o build)
+    # Portanto, subimos um nível ('..') e entramos na pasta do frontend.
+    frontend_folder = os.path.abspath(os.path.join(base_path, '..', 'plano-estudos-frontend', 'dist', 'renderer'))
 
-# --- BLOCO DE DEPURAÇÃO ADICIONADO ---
+
+
+# --- BLOCO DE DEPURAÇÃO ---
 print("--- INICIANDO DEPURAÇÃO DE CAMINHOS ---")
 print(f"O script está rodando como executável? {getattr(sys, 'frozen', False)}")
 print(f"Caminho Base (base_path) = {base_path}")
@@ -33,14 +43,15 @@ print("--- FIM DA DEPURAÇÃO ---")
 # --- FIM DO BLOCO DE DEPURAÇÃO ---
 
 app = Flask(__name__, static_folder=frontend_folder)
-# CORS não é estritamente necessário nesta configuração, mas é bom manter
+# CORS é útil em desenvolvimento, especialmente se o frontend e backend rodam em portas diferentes
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # --- Gerenciamento da Conexão ---
 def get_db_connection():
+    db_file = os.path.join(base_path, 'data.db')
     conn = getattr(g, '_database', None)
     if conn is None:
-        conn = g._database = sqlite3.connect(DB_FILE)
+        conn = g._database = sqlite3.connect(db_file)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
     return conn
@@ -314,9 +325,10 @@ def get_evolution():
 def sync_from_spreadsheet():
     try:
         conn = get_db_connection()
-        print(f"Tentando importar do arquivo: {EXCEL_FILE}")
-        if not os.path.exists(EXCEL_FILE):
-            return jsonify({"error": f"Arquivo não encontrado em: {EXCEL_FILE}"}), 404
+        excel_file = os.path.join(base_path, 'Planilha TCU - Auditor - Acompanhamento.xlsx')
+        print(f"Tentando importar do arquivo: {excel_file}")
+        if not os.path.exists(excel_file):
+            return jsonify({"error": f"Arquivo não encontrado em: {excel_file}"}), 404
         import_disciplines_from_excel(conn)
         import_ciclo_from_excel(conn)
         recalculate_evolution(conn)
@@ -376,14 +388,16 @@ def convert_time_to_minutes(time_obj):
     return 0
 
 def import_disciplines_from_excel(conn):
-    df = pd.read_excel(EXCEL_FILE, sheet_name='CICLO', header=2, usecols=['DISCIPLINA'])
+    excel_file = os.path.join(base_path, 'Planilha TCU - Auditor - Acompanhamento.xlsx')
+    df = pd.read_excel(excel_file, sheet_name='CICLO', header=2, usecols=['DISCIPLINA'])
     disciplinas = df['DISCIPLINA'].dropna().unique()
     cursor = conn.cursor()
     for d in disciplinas: cursor.execute("INSERT OR IGNORE INTO discipline (name) VALUES (?)", (d,))
     conn.commit()
 
 def import_ciclo_from_excel(conn):
-    df = pd.read_excel(EXCEL_FILE, sheet_name='CICLO', header=2)
+    excel_file = os.path.join(base_path, 'Planilha TCU - Auditor - Acompanhamento.xlsx')
+    df = pd.read_excel(excel_file, sheet_name='CICLO', header=2)
     df.columns = [c.strip() for c in df.columns]
     cursor = conn.cursor()
     added = 0
@@ -468,11 +482,14 @@ def serve(path):
     if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
         return send_from_directory(app.static_folder, path)
     else:
-        return send_from_directory(app.static_folder, 'index.html')
+        # Se o caminho não for encontrado, ou for a raiz, sirva o index.html
+        # Isso é crucial para que o roteamento do React (React Router) funcione
+        return send_from_directory(app.static_folder, 'renderer/index.html')
 
 # --- Inicialização ---
 with app.app_context():
     create_tables(get_db_connection())
 
 if __name__ == '__main__':
+    # Garante que o servidor Flask rode na porta 5000, como esperado pelo script 'electron:dev'
     app.run(debug=True, port=5000)

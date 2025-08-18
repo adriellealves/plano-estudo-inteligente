@@ -1,34 +1,43 @@
-# Logs
-logs
-*.log
+# ----------------------
+# Node / Frontend (Vite + Electron)
+# ----------------------
+node_modules/
+release/
+dist/                # build de desenvolvimento do Vite
+.vite/               # cache interno do Vite
+out/                 # se usar para builds de preview
+*.log                # logs do npm/yarn
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Electron
+release/             # instaladores finais do Electron
+*.asar               # pacotes de apps empacotados
+electron-builder.json
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
 
-# Arquivos de dependências
-/node_modules/
+env/
+venv/
+dist/
+build/
+*.spec 
+*.egg-info/
 
-# Arquivos de build
-/dist/
-
-# Logs e arquivos de ambiente
+# Arquivos sensíveis / dados
+*.db                 # banco de dados
+*.env                # variáveis de ambiente
+*.xlsx               # planilhas locais se não quiser versionar
+*.pem
+*.key
+*.crt
 .env
-npm-debug.log
+# IDEs / editores
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Sistema
+.DS_Store
+Thumbs.db

@@ -4,6 +4,13 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  
+  // --- Adicionado para o build do Electron ---
+  base: './', 
+  build: {
+    outDir: 'dist/renderer' 
+  },
+  // --- Mantido do seu arquivo original para o desenvolvimento ---
   server: {
     proxy: {
       // Redireciona requisições de /api para o seu backend Flask

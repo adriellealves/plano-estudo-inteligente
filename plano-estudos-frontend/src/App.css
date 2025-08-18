@@ -449,13 +449,22 @@ body {
 /* Adicione estas classes no final do seu arquivo src/App.css */
 
 /* Estilos para a lista de Trilhas */
-.trilhas-grid {
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+/* .trilhas-grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0.5rem;
+} */
+
+.trilhas-grid {
+ display: grid;
+ grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+/* gap: <espaço-linhas> <espaço-colunas>; */
+ gap: 3rem 0.75rem;
 }
+
+
 
 .status-badge {
   font-size: 0.75rem;
