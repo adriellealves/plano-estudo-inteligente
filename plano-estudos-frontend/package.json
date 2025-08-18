@@ -13,7 +13,7 @@
     "preview": "vite preview",
     "backend": "../plano-estudos-backend/venv/bin/python ../plano-estudos-backend/app.py",
     "electron:dev": "concurrently -k \"npm run dev\" \"npm run backend\" \"wait-on tcp:5173 && electron .\"",
-    "dist": "npm run build && electron-builder --win --linux"
+    "dist": "npm run build && electron-builder --win"
   },
   "build": {
     "appId": "com.meuapp.planodeestudos",
