@@ -4,18 +4,21 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch: # permite rodar manualmente
+  workflow_dispatch:
 
 jobs:
   build-app:
     runs-on: windows-latest
 
     steps:
+      # --------------------------
+      # 1️⃣ Checkout do código
+      # --------------------------
       - name: Checkout código
         uses: actions/checkout@v4
 
       # --------------------------
-      # Backend (PyInstaller)
+      # 2️⃣ Backend (Python + PyInstaller)
       # --------------------------
       - name: Configurar Python
         uses: actions/setup-python@v5
@@ -28,41 +31,72 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
+        shell: pwsh
+
+      - name: Limpar build anterior do backend
+        run: |
+          cd plano-estudos-backend
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue dist, build, *.spec, dist-ready
+        shell: pwsh
 
       - name: Gerar backend.exe
         run: |
           cd plano-estudos-backend
+          
+          # Gerar executável
           pyinstaller --onefile --noconsole app.py
-          mkdir dist-ready
-          copy dist\\app.exe dist-ready\\backend.exe
-          if exist data.db copy data.db dist-ready\\
-          if exist "Planilha TCU - Auditor - Acompanhamento.xlsx" copy "Planilha TCU - Auditor - Acompanhamento.xlsx" dist-ready\\
+
+          # Criar pasta para arquivos prontos
+          New-Item -ItemType Directory -Force -Path dist-ready
+
+          # Copiar executável
+          Copy-Item -Path "dist\app.exe" -Destination "dist-ready\backend.exe" -Force
+
+          # Copiar banco de dados se existir
+          if (Test-Path "data.db") {
+              Copy-Item -Path "data.db" -Destination "dist-ready\" -Force
+          }
+
+          # Copiar planilha se existir
+          if (Test-Path "Planilha TCU - Auditor - Acompanhamento.xlsx") {
+              Copy-Item -Path "Planilha TCU - Auditor - Acompanhamento.xlsx" -Destination "dist-ready\" -Force
+          }
+        shell: pwsh
 
       # --------------------------
-      # Frontend + Electron
+      # 3️⃣ Frontend + Electron
       # --------------------------
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
+      - name: Limpar build anterior do frontend
+        run: |
+          cd plano-estudos-frontend
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue node_modules, dist, release, backend
+        shell: pwsh
+
       - name: Instalar dependências do frontend
         run: |
           cd plano-estudos-frontend
           npm install
+        shell: pwsh
 
       - name: Copiar backend para recursos do Electron
         run: |
-          mkdir plano-estudos-frontend\\backend
-          copy plano-estudos-backend\\dist-ready\\* plano-estudos-frontend\\backend\\
+          New-Item -ItemType Directory -Force -Path plano-estudos-frontend\backend
+          Copy-Item -Path plano-estudos-backend\dist-ready\* -Destination plano-estudos-frontend\backend\ -Force
+        shell: pwsh
 
       - name: Build instalador Electron
         run: |
           cd plano-estudos-frontend
           npm run dist
+        shell: pwsh
 
       # --------------------------
-      # Upload final
+      # 4️⃣ Upload final
       # --------------------------
       - name: Upload instalador
         uses: actions/upload-artifact@v4
