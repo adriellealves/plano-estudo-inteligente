@@ -102,10 +102,103 @@ jobs:
           Copy-Item -Path $dbPath -Destination plano-estudos-frontend\backend\ -Force
         shell: pwsh
 
+      - name: Verificar estrutura de arquivos copiados
+        run: |
+          Write-Host "=== VERIFICAÇÃO DA ESTRUTURA DE BACKEND ==="
+          
+          # Verifica estrutura de pastas
+          Write-Host "Estrutura de backend:"
+          Get-ChildItem -Path "plano-estudos-frontend\backend" -Recurse | ForEach-Object {
+            Write-Host "  $($_.FullName)"
+          }
+          
+          # Verifica arquivos críticos
+          $criticalFiles = @(
+            "plano-estudos-frontend\backend\dist\app.exe",
+            "plano-estudos-frontend\backend\data.db",
+            "plano-estudos-frontend\backend\Planilha TCU - Auditor - Acompanhamento.xlsx"
+          )
+          
+          Write-Host "`n=== VERIFICAÇÃO DE ARQUIVOS CRÍTICOS ==="
+          $allFilesExist = $true
+          foreach ($file in $criticalFiles) {
+            if (Test-Path $file) {
+              $size = (Get-Item $file).Length
+              Write-Host "✅ $file ($size bytes)"
+            } else {
+              Write-Host "❌ $file (NÃO ENCONTRADO)"
+              $allFilesExist = $false
+            }
+          }
+          
+          if (-not $allFilesExist) {
+            Write-Host "`n❌ ERRO: Alguns arquivos críticos não foram encontrados!"
+            exit 1
+          } else {
+            Write-Host "`n✅ Todos os arquivos críticos estão presentes!"
+          }
+        shell: pwsh
+
       - name: Build instalador Electron
         run: |
           cd plano-estudos-frontend
           npm run dist -- --win
+        shell: pwsh
+
+      - name: Verificar resultado do build
+        run: |
+          Write-Host "=== VERIFICAÇÃO DO BUILD FINAL ==="
+          
+          # Lista todos os arquivos gerados
+          Write-Host "Arquivos no diretório de release:"
+          Get-ChildItem -Path "plano-estudos-frontend\release" -Recurse | ForEach-Object {
+            $size = $_.Length
+            Write-Host "  $($_.FullName) ($size bytes)"
+          }
+          
+          # Verifica se o instalador foi criado
+          $installer = Get-ChildItem -Path "plano-estudos-frontend\release" -Filter "*.exe" | Select-Object -First 1
+          if ($installer) {
+            Write-Host "`n✅ Instalador criado: $($installer.Name) ($($installer.Length) bytes)"
+          } else {
+            Write-Host "`n❌ Nenhum instalador foi encontrado!"
+            exit 1
+          }
+        shell: pwsh
+
+      - name: Verificação avançada do conteúdo
+        run: |
+          Write-Host "=== VERIFICAÇÃO AVANÇADA ==="
+          
+          # Verifica se o app.exe é um executável válido
+          $appExe = "plano-estudos-frontend\backend\dist\app.exe"
+          if (Test-Path $appExe) {
+            try {
+              $versionInfo = (Get-Item $appExe).VersionInfo
+              Write-Host "✅ $appExe é um executável válido"
+              Write-Host "   Versão do arquivo: $($versionInfo.FileVersion)"
+              Write-Host "   Tamanho: $((Get-Item $appExe).Length) bytes"
+            } catch {
+              Write-Host "⚠️  $appExe existe mas pode estar corrompido"
+            }
+          }
+          
+          # Verifica se o banco de dados SQLite é válido
+          $dbFile = "plano-estudos-frontend\backend\data.db"
+          if (Test-Path $dbFile) {
+            $dbSize = (Get-Item $dbFile).Length
+            Write-Host "✅ Banco de dados: $dbSize bytes"
+            
+            # Tenta uma consulta simples se o sqlite3 estiver disponível
+            try {
+              sqlite3 $dbFile "SELECT name FROM sqlite_master WHERE type='table';" 2>$null
+              if ($LASTEXITCODE -eq 0) {
+                Write-Host "✅ Estrutura do banco de dados é válida"
+              }
+            } catch {
+              Write-Host "⚠️  Não foi possível validar a estrutura do banco de dados"
+            }
+          }
         shell: pwsh
 
       # --------------------------

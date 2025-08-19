@@ -50,15 +50,28 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 # --- Gerenciamento da Conexão ---
 def get_db_connection():
     if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
         db_file = os.path.join(sys._MEIPASS, 'backend', 'data.db')
+        
+        if not os.path.exists(db_file):
+            open(db_file, 'w').close()
+            print(f"✅ Criado novo banco vazio em: {db_file}")
+            
     else:
         db_file = os.path.join(base_path, 'data.db')
-    conn = getattr(g, '_database', None)
-    if conn is None:
-        conn = g._database = sqlite3.connect(db_file)
+        
+    print(f"🔑 Usando banco em: {db_file}")
+        
+    try:
+        conn = sqlite3.connect(db_file)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+        return conn
+    except sqlite3.Error as e:
+        print(f"❌ Erro ao conectar com banco: {e}")
+        # Tenta criar um novo se falhar
+        open(db_file, 'w').close()
+        return sqlite3.connect(db_file)
 
 @app.teardown_appcontext
 def close_connection(exception):

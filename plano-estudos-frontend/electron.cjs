@@ -22,19 +22,6 @@ function createPythonProcess() {
     // Caminhos corrigidos
     const executableName = process.platform === 'win32' ? 'app.exe' : 'app';
     const scriptPath = path.join(backendDistPath, executableName);
-    const dbPath = path.join(backendPath, 'data.db'); // ✅ Correto: backend/ não backend/dist/
-
-    console.log(`Caminho do banco de dados: ${dbPath}`);
-
-    // Criar banco se necessário
-    if (!fs.existsSync(dbPath)) {
-      console.log("Criando novo banco de dados...");
-      const dbDir = path.dirname(dbPath);
-      if (!fs.existsSync(dbDir)) {
-        fs.mkdirSync(dbDir, { recursive: true });
-      }
-      fs.writeFileSync(dbPath, '');
-    }
 
     console.log(`Iniciando backend: ${scriptPath}`);
     pythonProcess = spawn(scriptPath);

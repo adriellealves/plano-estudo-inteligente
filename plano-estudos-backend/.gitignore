@@ -12,7 +12,6 @@ dist/
 build/
 *.spec               # pyinstaller
 *.egg-info/
-data.db
 # Arquivos sensíveis / dados
 *.db                 # banco de dados
 *.env                # variáveis de ambiente
