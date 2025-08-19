@@ -6,6 +6,7 @@ const fs = require('fs'); // ✅ Importe o módulo fs
 let pythonProcess = null;
 let mainWindow = null; // Referência global para a janela principal
 const isDev = !app.isPackaged;
+let isQuitting = false;
 
 function createPythonProcess() {
   return new Promise((resolve, reject) => {
@@ -76,6 +77,39 @@ function createPythonProcess() {
     }, 10000);
   });
 }
+
+function killBackendProcess() {
+  if (pythonProcess) {
+    console.log("Encerrando processo do backend...");
+    isQuitting = true;
+    
+    // Métodos diferentes para diferentes sistemas operacionais
+    if (process.platform === 'win32') {
+      // Windows: usa taskkill para forçar o encerramento
+      const { exec } = require('child_process');
+      exec(`taskkill /pid ${pythonProcess.pid} /t /f`, (err) => {
+        if (err) {
+          console.error('Falha ao encerrar processo com taskkill:', err);
+          // Fallback: encerramento normal
+          pythonProcess.kill();
+        }
+      });
+    } else {
+      // Unix-like systems: envia SIGTERM primeiro, depois SIGKILL se necessário
+      pythonProcess.kill('SIGTERM');
+      
+      setTimeout(() => {
+        if (pythonProcess && !pythonProcess.killed) {
+          console.log("Forçando encerramento do backend...");
+          pythonProcess.kill('SIGKILL');
+        }
+      }, 3000);
+    }
+    
+    pythonProcess = null;
+  }
+}
+
 
 function createWindow() {
   // Use uma referência global
@@ -167,12 +201,28 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  if (process.platform !== 'darwin') {
+    // Encerra o backend antes de sair
+    killBackendProcess();
+    app.quit();
+  }
+});
+
+app.on('before-quit', (event) => {
+  // Previne o encerramento padrão para garantir que o backend seja encerrado primeiro
+  if (!isQuitting) {
+    event.preventDefault();
+    isQuitting = true;
+    killBackendProcess();
+    
+    // Dá tempo para o backend encerrar antes de sair
+    setTimeout(() => {
+      app.quit();
+    }, 1000);
+  }
 });
 
 app.on('will-quit', () => {
-  if (pythonProcess) {
-    console.log("Encerrando backend...");
-    pythonProcess.kill();
-  }
+  // Garante que o backend seja encerrado
+  killBackendProcess();
 });

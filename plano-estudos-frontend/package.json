@@ -1,7 +1,7 @@
 {
   "name": "plano-de-estudos-app",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Um planejador de estudos inteligente para otimizar sua rotina.",
   "author": "Adrielle",
   "type": "module",
@@ -37,7 +37,8 @@
       }
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "assets/icon.ico"
     },
     "linux": {
       "target": "AppImage",
