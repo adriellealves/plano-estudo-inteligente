@@ -46,7 +46,7 @@ print("--- FIM DA DEPURAÇÃO ---")
 
 app = Flask(__name__, static_folder=frontend_folder)
 # CORS é útil em desenvolvimento, especialmente se o frontend e backend rodam em portas diferentes
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+CORS(app, resources={r"/api/*": {"origins": "file://*"}})
 
 # --- Gerenciamento da Conexão ---
 def get_db_connection():

@@ -78,13 +78,14 @@ function createPythonProcess() {
 }
 
 function createWindow() {
-  // ✅ Use uma referência global
+  // Use uma referência global
   mainWindow = new BrowserWindow({
     width: 1600,
     height: 800,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
+      webSecurity: false // Importante para permitir requisições locais
     },
     show: false // Não mostrar até estar pronto
   });
@@ -107,7 +108,7 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    // ✅ Caminho absoluto para o index.html
+    // Caminho absoluto para o index.html
     const indexPath = path.join(__dirname, 'dist', 'renderer', 'index.html');
     console.log(`Carregando frontend: ${indexPath}`);
     
@@ -122,10 +123,20 @@ function createWindow() {
       );
       app.quit();
     }
+
+    // // Intercepta requisições para redirecionar para a API
+    // mainWindow.webContents.session.webRequest.onBeforeRequest((details, callback) => {
+    //   if (details.url.startsWith('file:///C:/api/')) {
+    //     const newUrl = details.url.replace('file:///C:/api/', 'http://localhost:5000/api/');
+    //     callback({ cancel: false, redirectURL: newUrl });
+    //   } else {
+    //     callback({ cancel: false });
+    //   }
+    // });
   }
 }
 
-// ✅ Função para mostrar erros
+// Função para mostrar erros
 function showStartupError(message) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     dialog.showMessageBox(mainWindow, {
