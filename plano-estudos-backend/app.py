@@ -496,5 +496,6 @@ with app.app_context():
     create_tables(get_db_connection())
 
 if __name__ == '__main__':
+    print("✅✅✅✅ Backend Flask INICIADO com sucesso! ✅✅✅✅")
     # Garante que o servidor Flask rode na porta 5000, como esperado pelo script 'electron:dev'
     app.run(debug=True, port=5000)
