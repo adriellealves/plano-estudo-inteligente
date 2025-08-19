@@ -6,6 +6,7 @@ from datetime import datetime
 from flask_cors import CORS
 import os
 import sys
+import io
 
 # --- Bloco de Caminhos Corrigido ---
 # Determina o caminho base, seja rodando como script ou como executável
@@ -33,7 +34,7 @@ else:
 
 
 # --- BLOCO DE DEPURAÇÃO ---
-print("--- INICIANDO DEPURAÇÃO DE CAMINHOS ---")
+print("=== INICIANDO DEPURAÇÃO DE CAMINHOS ===")
 print(f"O script está rodando como executável? {getattr(sys, 'frozen', False)}")
 print(f"Caminho Base (base_path) = {base_path}")
 print(f"Caminho do Frontend (frontend_folder) = {frontend_folder}")
@@ -54,17 +55,13 @@ def get_db_connection():
         executable_dir = os.path.dirname(sys.executable)  # Pasta do executável (dist)
         db_file = os.path.join(executable_dir, 'data.db')
         
-        print(f"🔍 Procurando banco em: {db_file}")
-        
         # Se não existir, cria um novo
         if not os.path.exists(db_file):
-            print("📝 Criando novo banco de dados...")
             open(db_file, 'w').close()
     else:
         # Modo desenvolvimento
         db_file = os.path.join(base_path, 'data.db')
     
-    print(f"🔑 Usando banco em: {db_file}")
     
     try:
         conn = sqlite3.connect(db_file)
@@ -72,7 +69,7 @@ def get_db_connection():
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
     except sqlite3.Error as e:
-        print(f"❌ Erro ao conectar com banco: {e}")
+        print(f"Erro ao conectar com banco: {e}")
         # Tenta criar um novo se falhar
         open(db_file, 'w').close()
         return sqlite3.connect(db_file)
@@ -369,7 +366,6 @@ def sync_from_spreadsheet():
 # --- Funções Auxiliares ---
 
 def create_tables(conn):
-    print("✅ Verificando/Criando tabelas no banco de dados...")
     cursor = conn.cursor()
     cursor.execute("CREATE TABLE IF NOT EXISTS discipline (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)")
     cursor.execute("CREATE TABLE IF NOT EXISTS trilha (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)")
@@ -466,10 +462,10 @@ def import_ciclo_from_excel(conn):
                 cursor.execute("INSERT INTO result (task_id, correct, total, percent, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)",
                                (task_id_db, q_correct, q_total, percent))
     conn.commit()
-    print(f"✔️ {added} novas tarefas adicionadas.")
+    print(f"{added} novas tarefas adicionadas.")
 
 def recalculate_evolution(conn):
-    print("⏳ Iniciando recálculo da tabela de evolução...")
+    print("Iniciando recálculo da tabela de evolução...")
     tasks_results_query = "SELECT t.discipline_id, d.name as discipline_name, r.total, r.correct FROM task t JOIN discipline d ON t.discipline_id = d.id LEFT JOIN result r ON t.id = r.task_id"
     df_tasks = pd.read_sql_query(tasks_results_query, conn)
     study_time_query = """
@@ -483,7 +479,7 @@ def recalculate_evolution(conn):
     """
     df_study_time = pd.read_sql_query(study_time_query, conn)
     if df_tasks.empty:
-        print("⚠️ Não há dados de tarefas para calcular a evolução.")
+        print("Não há dados de tarefas para calcular a evolução.")
         return
     df_tasks.fillna(0, inplace=True)
     evo_data = df_tasks.groupby(['discipline_id', 'discipline_name']).agg(
@@ -502,7 +498,7 @@ def recalculate_evolution(conn):
         VALUES (?, ?, ?, ?, ?, ?)
         """, (row['discipline_id'], int(row['qtd_tarefas']), int(row['qtd_exercicios_feitos']), int(row['total_acertos']), row['desempenho_medio'], int(row['total_minutos_estudados'])))
     conn.commit()
-    print("✔️ Tabela de evolução atualizada.")
+    print("Tabela de evolução atualizada COM SUCESSO.")
 
 # --- Servindo o Frontend ---
 @app.route('/', defaults={'path': ''})
@@ -520,6 +516,6 @@ with app.app_context():
     create_tables(get_db_connection())
 
 if __name__ == '__main__':
-    print("✅✅✅✅ Backend Flask INICIADO com sucesso! ✅✅✅✅")
+    print("Backend Flask INICIADO com sucesso!")
     # Garante que o servidor Flask rode na porta 5000, como esperado pelo script 'electron:dev'
     app.run(debug=True, port=5000)
