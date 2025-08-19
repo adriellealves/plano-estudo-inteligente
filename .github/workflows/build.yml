@@ -46,20 +46,14 @@ jobs:
           # Gerar executável
           pyinstaller --onefile --noconsole app.py
 
-          # Criar pasta para arquivos prontos
-          New-Item -ItemType Directory -Force -Path dist-ready
-
-          # Copiar executável
-          Copy-Item -Path "dist\app.exe" -Destination "dist-ready\backend.exe" -Force
-
           # Copiar banco de dados se existir
           if (Test-Path "data.db") {
-              Copy-Item -Path "data.db" -Destination "dist-ready\" -Force
+              Copy-Item -Path "data.db" -Destination "dist\" -Force
           }
 
           # Copiar planilha se existir
           if (Test-Path "Planilha TCU - Auditor - Acompanhamento.xlsx") {
-              Copy-Item -Path "Planilha TCU - Auditor - Acompanhamento.xlsx" -Destination "dist-ready\" -Force
+              Copy-Item -Path "Planilha TCU - Auditor - Acompanhamento.xlsx" -Destination "dist\" -Force
           }
         shell: pwsh
 
@@ -69,7 +63,7 @@ jobs:
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Limpar build anterior do frontend
         run: |
@@ -88,18 +82,21 @@ jobs:
           # Cria estrutura de pastas
           New-Item -ItemType Directory -Force -Path plano-estudos-frontend\backend\dist
           
-          # Copia executável mantendo nome original
+          # Copia executável para dist/
           Copy-Item -Path plano-estudos-backend\dist\app.exe -Destination plano-estudos-frontend\backend\dist\app.exe -Force
           
-          # Copia planilha para o diretório principal do backend
-          Copy-Item -Path "plano-estudos-backend\Planilha TCU - Auditor - Acompanhamento.xlsx" -Destination plano-estudos-frontend\backend\ -Force
+          # Copia banco de dados para dist/ (mesma pasta do executável)
+          Copy-Item -Path plano-estudos-backend\data.db -Destination plano-estudos-frontend\backend\dist\data.db -Force
           
-          # Cria banco de dados vazio se não existir
-          $dbPath = "plano-estudos-backend\data.db"
-          if (-not (Test-Path $dbPath)) {
-              New-Item -ItemType File -Path $dbPath
+          # Copia planilha para dist/ (mesma pasta do executável)
+          Copy-Item -Path "plano-estudos-backend\Planilha TCU - Auditor - Acompanhamento.xlsx" -Destination plano-estudos-frontend\backend\dist\ -Force
+          
+          # Verificação
+          Write-Host "Estrutura final da pasta dist:"
+          Get-ChildItem -Path "plano-estudos-frontend\backend\dist" | ForEach-Object {
+              $size = $_.Length
+              Write-Host "  $($_.Name) ($size bytes)"
           }
-          Copy-Item -Path $dbPath -Destination plano-estudos-frontend\backend\ -Force
         shell: pwsh
 
       - name: Verificar estrutura de arquivos copiados
@@ -115,8 +112,8 @@ jobs:
           # Verifica arquivos críticos
           $criticalFiles = @(
             "plano-estudos-frontend\backend\dist\app.exe",
-            "plano-estudos-frontend\backend\data.db",
-            "plano-estudos-frontend\backend\Planilha TCU - Auditor - Acompanhamento.xlsx"
+            "plano-estudos-frontend\backend\dist\data.db",
+            "plano-estudos-frontend\backend\dist\Planilha TCU - Auditor - Acompanhamento.xlsx"
           )
           
           Write-Host "`n=== VERIFICAÇÃO DE ARQUIVOS CRÍTICOS ==="
@@ -165,6 +162,29 @@ jobs:
             exit 1
           }
         shell: pwsh
+      
+      - name: Verificar estrutura final
+        run: |
+          $distPath = "plano-estudos-frontend\backend\dist"
+          Write-Host "=== CONTEÚDO DA PASTA DIST ==="
+          
+          $files = Get-ChildItem -Path $distPath
+          foreach ($file in $files) {
+              $size = $file.Length
+              Write-Host "  $($file.Name) ($size bytes)"
+          }
+          
+          # Verifica se os 3 arquivos essenciais estão presentes
+          $essentialFiles = @("app.exe", "data.db", "Planilha TCU - Auditor - Acompanhamento.xlsx")
+          $missingFiles = $essentialFiles | Where-Object { -not (Test-Path "$distPath\$_") }
+          
+          if ($missingFiles.Count -gt 0) {
+              Write-Host "❌ Arquivos faltantes: $($missingFiles -join ', ')"
+              exit 1
+          } else {
+              Write-Host "✅ Todos os arquivos essenciais estão presentes!"
+          }
+        shell: pwsh
 
       - name: Verificação avançada do conteúdo
         run: |
@@ -184,7 +204,7 @@ jobs:
           }
           
           # Verifica se o banco de dados SQLite é válido
-          $dbFile = "plano-estudos-frontend\backend\data.db"
+          $dbFile = "plano-estudos-frontend\backend\dist\data.db"
           if (Test-Path $dbFile) {
             $dbSize = (Get-Item $dbFile).Length
             Write-Host "✅ Banco de dados: $dbSize bytes"

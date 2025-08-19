@@ -50,18 +50,22 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 # --- Gerenciamento da Conexão ---
 def get_db_connection():
     if getattr(sys, 'frozen', False):
-        base_dir = os.path.dirname(sys.executable)
-        db_file = os.path.join(sys._MEIPASS, 'backend', 'data.db')
+        # Modo produção: tudo na mesma pasta do executável (dist)
+        executable_dir = os.path.dirname(sys.executable)  # Pasta do executável (dist)
+        db_file = os.path.join(executable_dir, 'data.db')
         
+        print(f"🔍 Procurando banco em: {db_file}")
+        
+        # Se não existir, cria um novo
         if not os.path.exists(db_file):
+            print("📝 Criando novo banco de dados...")
             open(db_file, 'w').close()
-            print(f"✅ Criado novo banco vazio em: {db_file}")
-            
     else:
+        # Modo desenvolvimento
         db_file = os.path.join(base_path, 'data.db')
-        
+    
     print(f"🔑 Usando banco em: {db_file}")
-        
+    
     try:
         conn = sqlite3.connect(db_file)
         conn.row_factory = sqlite3.Row
@@ -342,7 +346,14 @@ def get_evolution():
 def sync_from_spreadsheet():
     try:
         conn = get_db_connection()
-        excel_file = os.path.join(base_path, 'Planilha TCU - Auditor - Acompanhamento.xlsx')
+        if getattr(sys, 'frozen', False):
+            # Modo produção: planilha na mesma pasta do executável
+            executable_dir = os.path.dirname(sys.executable)
+            excel_file = os.path.join(executable_dir, 'Planilha TCU - Auditor - Acompanhamento.xlsx')
+        else:
+            # Modo desenvolvimento
+            excel_file = os.path.join(base_path, 'Planilha TCU - Auditor - Acompanhamento.xlsx')
+        
         print(f"Tentando importar do arquivo: {excel_file}")
         if not os.path.exists(excel_file):
             return jsonify({"error": f"Arquivo não encontrado em: {excel_file}"}), 404
