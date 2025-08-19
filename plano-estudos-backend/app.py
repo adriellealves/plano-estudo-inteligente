@@ -16,12 +16,14 @@ if getattr(sys, 'frozen', False):
     base_path = sys._MEIPASS
     # Em produção, o frontend (pasta 'dist') é empacotado junto ao executável
     frontend_folder = os.path.join(base_path, 'dist')
-    spreadsheet_path = os.path.join(base_path, 'backend', 'Planilha TCU - Auditor - Acompanhamento.xlsx')
+    executable_dir = os.path.dirname(sys.executable)  # Pasta do executável (dist)
+    excel_file = os.path.join(executable_dir, 'Planilha TCU - Auditor - Acompanhamento.xlsx')
 else:
     # Se estiver rodando como um script normal (MODO DESENVOLVIMENTO)
     # O base_path é o diretório do script app.py (.../plano-estudos-backend)
     base_path = os.path.dirname(os.path.abspath(__file__))
-    
+    # Modo desenvolvimento
+    excel_file = os.path.join(base_path, 'Planilha TCU - Auditor - Acompanhamento.xlsx')
 
     # Em desenvolvimento, a pasta 'dist' do frontend está em um caminho relativo diferente.
     # A estrutura esperada é:
@@ -343,15 +345,8 @@ def get_evolution():
 def sync_from_spreadsheet():
     try:
         conn = get_db_connection()
-        if getattr(sys, 'frozen', False):
-            # Modo produção: planilha na mesma pasta do executável
-            executable_dir = os.path.dirname(sys.executable)
-            excel_file = os.path.join(executable_dir, 'Planilha TCU - Auditor - Acompanhamento.xlsx')
-        else:
-            # Modo desenvolvimento
-            excel_file = os.path.join(base_path, 'Planilha TCU - Auditor - Acompanhamento.xlsx')
-        
         print(f"Tentando importar do arquivo: {excel_file}")
+        
         if not os.path.exists(excel_file):
             return jsonify({"error": f"Arquivo não encontrado em: {excel_file}"}), 404
         import_disciplines_from_excel(conn)
@@ -413,7 +408,6 @@ def convert_time_to_minutes(time_obj):
     return 0
 
 def import_disciplines_from_excel(conn):
-    excel_file = os.path.join(base_path, 'Planilha TCU - Auditor - Acompanhamento.xlsx')
     df = pd.read_excel(excel_file, sheet_name='CICLO', header=2, usecols=['DISCIPLINA'])
     disciplinas = df['DISCIPLINA'].dropna().unique()
     cursor = conn.cursor()
@@ -421,7 +415,6 @@ def import_disciplines_from_excel(conn):
     conn.commit()
 
 def import_ciclo_from_excel(conn):
-    excel_file = os.path.join(base_path, 'Planilha TCU - Auditor - Acompanhamento.xlsx')
     df = pd.read_excel(excel_file, sheet_name='CICLO', header=2)
     df.columns = [c.strip() for c in df.columns]
     cursor = conn.cursor()
