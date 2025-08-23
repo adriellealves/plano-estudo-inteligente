@@ -13,12 +13,15 @@ import { Importer } from './Importer';
 import { TrailsPage } from './TrailsPage';
 import { Timer, ListChecks, PieChart as PieChartIcon, Edit, CalendarClock, GitMerge } from "lucide-react";
 import { useStudyTimer } from './TimerContext';
+import { PdfUpload } from './PdfUpload';
+import { PdfList } from './PdfList';
 
 export default function App() {
   const [tab, setTab] = useState("dashboard");
   const [refreshKey, setRefreshKey] = useState(0);
   const [modal, setModal] = useState({ isOpen: false, type: null, data: null });
   const [disciplines, setDisciplines] = useState([]);
+  const [disciplinaSelecionada, setDisciplinaSelecionada] = useState('');
   
   // Apenas a função stopTimer é necessária aqui para o alerta
   const { session } = useStudyTimer(); 
@@ -57,6 +60,7 @@ export default function App() {
     { id: "tasks", label: "Tarefas", icon: <ListChecks /> },
     { id: "timer", label: "Sessões", icon: <Timer /> },
     { id: "manage", label: "Gerenciar", icon: <Edit /> },
+    { id: "pdfs", label: "PDFs", icon: <CalendarClock /> },
   ];
 
   return (
@@ -85,6 +89,21 @@ export default function App() {
         {tab === "tasks" && <Tasks key={refreshKey} onEditTask={(task) => handleOpenModal('task', task)} onDataChange={handleSync} />}
         {tab === "timer" && <TimerPage key={refreshKey} />}
         {tab === "manage" && <ManagePage key={refreshKey} onOpenModal={handleOpenModal} />}
+        {tab === "pdfs" && (
+        <div>
+          <h2>Gerenciar PDFs por Disciplina</h2>
+          <PdfUpload disciplinas={disciplines} onUpload={() => {}} />
+          <hr />
+          <select
+            onChange={e => setDisciplinaSelecionada(e.target.value)}
+            value={disciplinaSelecionada}
+          >
+            <option value="">Selecione a disciplina para listar PDFs</option>
+            {disciplines.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+          </select>
+          {disciplinaSelecionada && <PdfList disciplina={disciplinaSelecionada} />}
+        </div>
+      )}
       </main>
       <footer className="footer">API Conectada</footer>
 

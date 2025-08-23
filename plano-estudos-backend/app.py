@@ -112,6 +112,25 @@ def upload_pdf():
         return jsonify({'message': 'PDF enviado com sucesso'}), 200
     return jsonify({'error': 'Arquivo inválido'}), 400
 
+# Listar PDFs por disciplina
+@app.route('/api/pdf/list/<disciplina>', methods=['GET'])
+def list_pdfs(disciplina):
+    disciplina_folder = os.path.join(PDF_UPLOAD_FOLDER, disciplina)
+    if not os.path.exists(disciplina_folder):
+        return jsonify([])
+    files = [f for f in os.listdir(disciplina_folder) if allowed_file(f)]
+    return jsonify(files)
+
+# Baixar/visualizar PDF
+@app.route('/api/pdf/view/<disciplina>/<filename>', methods=['GET'])
+def view_pdf(disciplina, filename):
+    disciplina_folder = os.path.join(PDF_UPLOAD_FOLDER, disciplina)
+    file_path = os.path.join(disciplina_folder, filename)
+    if not os.path.exists(file_path):
+        return jsonify({'error': 'Arquivo não encontrado'}), 404
+    return send_from_directory(disciplina_folder, filename)
+
+
 @app.route('/api/dashboard/summary', methods=['GET'])
 def get_dashboard_summary():
     conn = get_db_connection()
