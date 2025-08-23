@@ -83,6 +83,34 @@ def close_connection(exception):
         conn.close()
 
 # --- API Endpoints ---
+# --- PDF Upload/Download Endpoints ---
+from werkzeug.utils import secure_filename
+
+PDF_UPLOAD_FOLDER = os.path.join(base_path, 'pdfs')
+ALLOWED_EXTENSIONS = {'pdf'}
+if not os.path.exists(PDF_UPLOAD_FOLDER):
+    os.makedirs(PDF_UPLOAD_FOLDER)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# Upload PDF por disciplina
+@app.route('/api/pdf/upload', methods=['POST'])
+def upload_pdf():
+    disciplina = request.form.get('disciplina')
+    if 'file' not in request.files or not disciplina:
+        return jsonify({'error': 'Arquivo ou disciplina não enviados'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'Nenhum arquivo selecionado'}), 400
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        disciplina_folder = os.path.join(PDF_UPLOAD_FOLDER, disciplina)
+        if not os.path.exists(disciplina_folder):
+            os.makedirs(disciplina_folder)
+        file.save(os.path.join(disciplina_folder, filename))
+        return jsonify({'message': 'PDF enviado com sucesso'}), 200
+    return jsonify({'error': 'Arquivo inválido'}), 400
 
 @app.route('/api/dashboard/summary', methods=['GET'])
 def get_dashboard_summary():
