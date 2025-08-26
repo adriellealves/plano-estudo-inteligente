@@ -55,6 +55,11 @@ jobs:
           if (Test-Path "Planilha TCU - Auditor - Acompanhamento.xlsx") {
               Copy-Item -Path "Planilha TCU - Auditor - Acompanhamento.xlsx" -Destination "dist\" -Force
           }
+
+          # Copiar course_links.json
+          if (Test-Path "course_links.json") {
+              Copy-Item -Path "course_links.json" -Destination "dist\" -Force
+          }
         shell: pwsh
 
       # --------------------------
@@ -91,6 +96,9 @@ jobs:
           # Copia planilha para dist/ (mesma pasta do executável)
           Copy-Item -Path "plano-estudos-backend\Planilha TCU - Auditor - Acompanhamento.xlsx" -Destination plano-estudos-frontend\backend\dist\ -Force
           
+          # Copia course_links.json para dist/
+          Copy-Item -Path "plano-estudos-backend\course_links.json" -Destination plano-estudos-frontend\backend\dist\ -Force
+          
           # Verificação
           Write-Host "Estrutura final da pasta dist:"
           Get-ChildItem -Path "plano-estudos-frontend\backend\dist" | ForEach-Object {
@@ -113,7 +121,8 @@ jobs:
           $criticalFiles = @(
             "plano-estudos-frontend\backend\dist\app.exe",
             "plano-estudos-frontend\backend\dist\data.db",
-            "plano-estudos-frontend\backend\dist\Planilha TCU - Auditor - Acompanhamento.xlsx"
+            "plano-estudos-frontend\backend\dist\Planilha TCU - Auditor - Acompanhamento.xlsx",
+            "plano-estudos-frontend\backend\dist\course_links.json"
           )
           
           Write-Host "`n=== VERIFICAÇÃO DE ARQUIVOS CRÍTICOS ==="
