@@ -363,6 +363,20 @@ def get_session_history():
     """).fetchall()
     return jsonify([dict(row) for row in history])
 
+@app.route('/api/sessions/<int:session_id>', methods=['DELETE'])
+def delete_session(session_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Deleta a sessão
+    cursor.execute('DELETE FROM study_session WHERE id = ?', (session_id,))
+    conn.commit()
+    
+    # Recalcula evolução após excluir a sessão
+    recalculate_evolution(conn)
+    
+    return jsonify({"message": "Sessão excluída com sucesso"})
+
 @app.route('/api/results', methods=['POST'])
 def add_result():
     data = request.get_json()

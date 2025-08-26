@@ -60,15 +60,22 @@ export function TimerProvider({ children, onDataChange }) {
     const duration = Math.round((endTime - startTime) / 60000);
     const payload = { ...session, end: endTime.toISOString(), duration_minutes: duration };
 
-    try {
-      await api("/sessions/save", { method: "POST", body: JSON.stringify(payload) });
+    // Verifica se a sessão tem menos de 30 minutos
+    if (duration < 30) {
       setAlert({
         show: true,
-        type: 'success',
-        title: 'Sessão Salva',
-        message: `Sessão salva com sucesso: ${duration} minutos`
+        type: 'confirm',
+        title: 'Sessão Curta',
+        message: `A sessão tem apenas ${duration} minutos. Sessões muito curtas podem não ser efetivas. Deseja salvar mesmo assim?`,
+        onConfirm: () => saveSession(payload),
+        confirmLabel: 'Salvar',
+        cancelLabel: 'Cancelar'
       });
-      if (onDataChange) onDataChange();
+      return;
+    }
+
+    try {
+      await saveSession(payload);
     } catch (e) {
       setAlert({
         show: true,
@@ -76,15 +83,47 @@ export function TimerProvider({ children, onDataChange }) {
         title: 'Erro ao Salvar',
         message: e.message
       });
-    } finally {
-      if (timerRef.current) clearInterval(timerRef.current);
-      sessionStorage.removeItem(SESSION_STORAGE_KEY);
-      setSession(null);
-      setElapsed("00:00:00");
     }
   };
 
-  const value = { session, elapsed, startTimer, stopTimer };
+  const saveSession = async (payload) => {
+    await api("/sessions/save", { method: "POST", body: JSON.stringify(payload) });
+    setAlert({
+      show: true,
+      type: 'success',
+      title: 'Sessão Salva',
+      message: `Sessão salva com sucesso: ${payload.duration_minutes} minutos`
+    });
+    if (onDataChange) onDataChange();
+    if (timerRef.current) clearInterval(timerRef.current);
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    setSession(null);
+    setElapsed("00:00:00");
+  };
+
+  const deleteSession = async (sessionId) => {
+    try {
+      await api(`/sessions/${sessionId}`, { method: "DELETE" });
+      setAlert({
+        show: true,
+        type: 'success',
+        title: 'Sessão Excluída',
+        message: 'Sessão excluída com sucesso'
+      });
+      // Atualiza o estado para forçar a atualização do histórico
+      setSession(prevSession => ({ ...prevSession }));
+      if (onDataChange) onDataChange();
+    } catch (e) {
+      setAlert({
+        show: true,
+        type: 'error',
+        title: 'Erro ao Excluir',
+        message: e.message
+      });
+    }
+  };
+
+  const value = { session, elapsed, startTimer, stopTimer, deleteSession };
 
   return (
     <TimerContext.Provider value={value}>
@@ -94,7 +133,9 @@ export function TimerProvider({ children, onDataChange }) {
         title={alert.title}
         message={alert.message}
         type={alert.type}
-        confirmLabel="OK"
+        onConfirm={alert.onConfirm}
+        confirmLabel={alert.confirmLabel || "OK"}
+        cancelLabel={alert.cancelLabel}
       />
       {children}
     </TimerContext.Provider>

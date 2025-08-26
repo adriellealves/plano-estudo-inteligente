@@ -1015,6 +1015,11 @@ body {
   align-items: center;
   font-weight: 500;
 }
+.history-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 .history-item-duration {
   font-size: 0.875rem;
   font-weight: 600;

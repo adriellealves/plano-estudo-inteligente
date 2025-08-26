@@ -3,30 +3,64 @@
 import React, { useState, useEffect } from 'react';
 import { api } from './api';
 import { Card, Button, Select } from './components';
-import { Timer, Play, Square, ListChecks } from 'lucide-react';
+import { Timer, Play, Square, ListChecks, Trash2 } from 'lucide-react';
 import { useStudyTimer } from './TimerContext';
+import { AlertDialog } from './AlertDialog';
 
 // Novo componente para exibir o histórico
 function SessionHistory({ sessions }) {
+  const { deleteSession } = useStudyTimer();
+  const [alert, setAlert] = useState({ show: false, type: '', message: '', title: '', onConfirm: null });
+
   if (!sessions || sessions.length === 0) {
     return <p className="empty-list-message">Nenhuma sessão de estudo salva ainda.</p>;
   }
 
+  const handleDelete = (sessionId) => {
+    setAlert({
+      show: true,
+      type: 'confirm',
+      title: 'Confirmar Exclusão',
+      message: 'Tem certeza que deseja excluir esta sessão de estudo?',
+      onConfirm: () => {
+        deleteSession(sessionId);
+        setAlert({ ...alert, show: false });
+      }
+    });
+  };
+
   return (
-    <ul className="history-list">
-      {sessions.map(s => (
-        <li key={s.id}>
-          <div className="history-item-main">
-            <span className="history-item-title">{s.task_title || s.discipline_name || "Sessão Avulsa"}</span>
-            <span className="history-item-duration">{s.duration_minutes} min</span>
-          </div>
-          <div className="history-item-meta">
-            <span>Início: {new Date(s.start).toLocaleString()}</span>
-            <span>Fim: {new Date(s.end).toLocaleString()}</span>
-          </div>
-        </li>
-      ))}
-    </ul>
+    <>
+      <AlertDialog
+        isOpen={alert.show}
+        onClose={() => setAlert({ ...alert, show: false })}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        confirmLabel={alert.type === 'confirm' ? 'Excluir' : 'OK'}
+        cancelLabel={alert.type === 'confirm' ? 'Cancelar' : undefined}
+        onConfirm={alert.onConfirm}
+      />
+      <ul className="history-list">
+        {sessions.map(s => (
+          <li key={s.id}>
+            <div className="history-item-main">
+              <span className="history-item-title">{s.task_title || s.discipline_name || "Sessão Avulsa"}</span>
+              <div className="history-item-actions">
+                <span className="history-item-duration">{s.duration_minutes} min</span>
+                <Button variant="ghost" onClick={() => handleDelete(s.id)} title="Excluir sessão">
+                  <Trash2 size={16} />
+                </Button>
+              </div>
+            </div>
+            <div className="history-item-meta">
+              <span>Início: {new Date(s.start).toLocaleString()}</span>
+              <span>Fim: {new Date(s.end).toLocaleString()}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
