@@ -762,24 +762,80 @@ def get_performance_history():
     data = conn.execute(query, params).fetchall()
     return jsonify([dict(row) for row in data])
 
+def validate_course_data(data):
+    """Valida a estrutura do JSON de cursos"""
+    if not isinstance(data, dict):
+        raise ValueError("JSON inválido: deve ser um objeto")
+    
+    if 'courses' not in data:
+        raise ValueError("JSON inválido: deve conter uma chave 'courses'")
+    
+    if not isinstance(data['courses'], list):
+        raise ValueError("JSON inválido: 'courses' deve ser uma lista")
+    
+    for course in data['courses']:
+        if not isinstance(course, dict):
+            raise ValueError("JSON inválido: cada curso deve ser um objeto")
+        
+        if 'name' not in course or 'url' not in course:
+            raise ValueError("JSON inválido: cada curso deve ter 'name' e 'url'")
+        
+        if not isinstance(course['name'], str) or not isinstance(course['url'], str):
+            raise ValueError("JSON inválido: 'name' e 'url' devem ser strings")
+
 @app.route('/api/courses', methods=['GET'])
 def get_courses():
     try:
-        # Se estiver rodando como executável, procura no diretório do executável
+        # Se estiver rodando como executável, procura em múltiplos locais possíveis
+        possible_paths = []
+        
         if getattr(sys, 'frozen', False):
             executable_dir = os.path.dirname(sys.executable)
-            json_path = os.path.join(executable_dir, 'course_links.json')
+            possible_paths.extend([
+                os.path.join(executable_dir, 'course_links.json'),
+                os.path.join(executable_dir, 'resources', 'course_links.json'),
+                os.path.join(sys._MEIPASS, 'course_links.json')
+            ])
         else:
-            # Em desenvolvimento, usa o diretório do script
-            json_path = os.path.join(base_path, 'course_links.json')
+            # Em desenvolvimento
+            possible_paths.append(os.path.join(base_path, 'course_links.json'))
 
-        print(f"Tentando ler arquivo de: {json_path}")  # Debug log
-        
-        with open(json_path) as f:
-            return jsonify(json.load(f))
+        # Tenta cada caminho possível
+        for json_path in possible_paths:
+            print(f"Tentando ler arquivo de: {json_path}")
+            if os.path.exists(json_path):
+                try:
+                    with open(json_path, encoding='utf-8') as f:
+                        data = json.load(f)
+                        # Valida a estrutura do JSON
+                        validate_course_data(data)
+                        return jsonify(data)
+                except json.JSONDecodeError as e:
+                    print(f"Erro ao decodificar JSON em {json_path}: {e}")
+                    continue
+                except Exception as e:
+                    print(f"Erro ao processar {json_path}: {e}")
+                    continue
+
+        # Se chegou aqui, não conseguiu ler de nenhum local
+        # Tenta usar um fallback com dados básicos
+        fallback_data = {
+            "courses": [
+                {
+                    "name": "PORTUGUÊS",
+                    "url": "https://www.estrategiaconcursos.com.br/app/dashboard/cursos/"
+                }
+            ]
+        }
+        print("Usando dados fallback devido a falha na leitura do arquivo")
+        return jsonify(fallback_data)
+
     except Exception as e:
-        print(f"Erro ao ler course_links.json: {e}")  # Debug log
-        return jsonify({"error": str(e)}), 500
+        print(f"Erro crítico ao processar courses: {str(e)}")
+        return jsonify({
+            "error": "Erro ao carregar cursos",
+            "details": str(e)
+        }), 500
 
 @app.route('/api/sync', methods=['POST'])
 def sync_from_spreadsheet():
