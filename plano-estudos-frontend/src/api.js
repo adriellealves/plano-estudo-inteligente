@@ -18,3 +18,20 @@ export async function api(path, opts = {}) {
   const text = await res.text();
   return text ? JSON.parse(text) : {};
 }
+
+export function getNotifications() {
+  return api('/notifications');
+}
+
+export function markNotificationAsRead(ids) {
+  return api('/notifications/mark-read', {
+    method: 'POST',
+    body: JSON.stringify({ ids })
+  });
+}
+
+export function checkNotifications() {
+  return api('/notifications/check', {
+    method: 'POST'
+  });
+}
