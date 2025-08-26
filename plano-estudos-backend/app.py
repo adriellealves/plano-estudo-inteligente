@@ -765,9 +765,20 @@ def get_performance_history():
 @app.route('/api/courses', methods=['GET'])
 def get_courses():
     try:
-        with open(os.path.join(base_path, 'course_links.json')) as f:
+        # Se estiver rodando como executável, procura no diretório do executável
+        if getattr(sys, 'frozen', False):
+            executable_dir = os.path.dirname(sys.executable)
+            json_path = os.path.join(executable_dir, 'course_links.json')
+        else:
+            # Em desenvolvimento, usa o diretório do script
+            json_path = os.path.join(base_path, 'course_links.json')
+
+        print(f"Tentando ler arquivo de: {json_path}")  # Debug log
+        
+        with open(json_path) as f:
             return jsonify(json.load(f))
     except Exception as e:
+        print(f"Erro ao ler course_links.json: {e}")  # Debug log
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/sync', methods=['POST'])
