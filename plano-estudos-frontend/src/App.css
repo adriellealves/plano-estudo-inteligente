@@ -71,6 +71,122 @@ body {
   margin-top: 0.5rem;
 }
 
+/* Estilos para o painel de notificações */
+.notifications-container {
+  position: relative;
+}
+
+.notifications-trigger {
+  position: relative;
+  padding: 0.5rem;
+}
+
+.notifications-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: #ef4444;
+  color: white;
+  border-radius: 9999px;
+  min-width: 18px;
+  height: 18px;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.notifications-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 360px;
+  max-width: calc(100vw - 2rem);
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  z-index: 50;
+  margin-top: 0.5rem;
+}
+
+.notifications-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.notifications-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.notifications-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  border-left: 4px solid;
+  transition: background-color 0.2s;
+}
+
+.notification-item:hover {
+  background-color: #f9fafb;
+}
+
+.notification-icon {
+  color: var(--muted-text);
+}
+
+.notification-content {
+  flex: 1;
+}
+
+.notification-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.notification-message {
+  font-size: 0.875rem;
+  color: var(--muted-text);
+  margin-bottom: 0.25rem;
+}
+
+.notification-time {
+  font-size: 0.75rem;
+  color: var(--muted-text);
+}
+
+.notifications-empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--muted-text);
+  font-size: 0.875rem;
+}
+
+.notifications-footer {
+  padding: 1rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: center;
+}
+
+.notification-action {
+  padding: 0.25rem;
+  color: var(--muted-text);
+}
+
 .main-content {
   padding-top: 1.5rem;
   padding-bottom: 1.5rem;
@@ -156,12 +272,137 @@ body {
 /* Layout de Grid */
 .grid-container {
   display: grid;
-  gap: 1rem;
+  gap: 4rem;
 }
 .dashboard {
   display: flex;
   flex-direction: column;
+  gap: 4rem;
+}
+
+/* Estilos para análise de tópicos */
+.topics-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.topics-header {
+  display: flex;
+  justify-content: flex-end;
   gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.topics-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.discipline-topics {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.discipline-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin: 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.topics-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.topic-card {
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.topic-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.topic-header h4 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.topic-performance {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.topic-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.topic-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.topic-stat span:first-child {
+  color: var(--muted-text);
+}
+
+.topic-stat span:last-child {
+  font-weight: 500;
+}
+
+.topic-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #ef4444;
+  font-size: 0.8rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Variantes de performance */
+.performance-strong {
+  border-left: 4px solid #10b981;
+}
+
+.performance-medium {
+  border-left: 4px solid #f59e0b;
+}
+
+.performance-weak {
+  border-left: 4px solid #ef4444;
+}
+
+.performance-strong .topic-performance {
+  color: #10b981;
+}
+
+.performance-medium .topic-performance {
+  color: #f59e0b;
+}
+
+.performance-weak .topic-performance {
+  color: #ef4444;
 }
 
 @media (min-width: 1024px) {
@@ -362,6 +603,49 @@ body {
   flex-direction: column;
   gap: 1rem;
 }
+
+/* Alert Dialog */
+.alert-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 300px;
+}
+
+.alert-dialog-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.alert-dialog-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--orange-4);
+  color: var(--orange-9);
+}
+
+.alert-dialog-icon.error {
+  background: #fca5a5;
+  color: #dc2626;
+}
+
+.alert-dialog-message {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.alert-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
 .form-actions {
   display: flex;
   justify-content: flex-end;
@@ -414,6 +698,160 @@ body {
   align-content: center;
   margin-bottom: 0.35rem;
   margin-top: 1rem;
+}
+
+/* Estilos para a página de Metas */
+.goals-header {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1rem;
+}
+
+.goals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 4rem 1rem;
+}
+
+.goals-form {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    border-radius: 1rem;
+    padding: 1rem;
+    gap: 1rem 1rem;
+}
+
+.form-dates {
+    display: flex;
+    gap: 1rem 4rem;
+}
+
+.goals-form input {
+    width: 97,8%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    background-color: var(--card-background);
+    font-size: 0.875rem;
+    transition: border-color 0.2s;
+}
+
+.goals-form select {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    background-color: var(--card-background);
+    font-size: 0.875rem;
+    transition: border-color 0.2s;
+}
+
+.goals-form input:focus,
+.goals-form select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.goals-form label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-color);
+    margin-bottom: 0.25rem;
+}
+
+.goal-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem 1rem;
+}
+
+.goal-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.goal-progress {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.progress-bar-container {
+    flex-grow: 1;
+    height: 8px;
+    background-color: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background-color: var(--primary-color);
+    transition: width 0.3s ease;
+}
+
+.progress-bar.completed {
+    background-color: #10b981;
+}
+
+.progress-bar.at-risk {
+    background-color: #ef4444;
+}
+
+.progress-label {
+    min-width: 48px;
+    text-align: right;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.goal-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+/* Estilos para a página de Performance */
+.performance-filters {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.performance-chart {
+  background: white;
+  border-radius: 1rem;
+  padding: 1rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.performance-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.stat-card {
+  background: white;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-color);
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--primary-color);
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--muted-text);
 }
 
 /* Estilos para o formulário de resultados */
@@ -576,6 +1014,11 @@ body {
   justify-content: space-between;
   align-items: center;
   font-weight: 500;
+}
+.history-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 .history-item-duration {
   font-size: 0.875rem;

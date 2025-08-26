@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from './api';
 import { Card, Button, Select, Input } from './components';
 import { PlusCircle, CheckCircle2 } from 'lucide-react';
+import { AlertDialog } from './AlertDialog';
 
 export function AddResultCard({ onDataChange }) {
   const [taskId, setTaskId] = useState("");
@@ -9,6 +10,7 @@ export function AddResultCard({ onDataChange }) {
   const [correct, setCorrect] = useState("");
   const [total, setTotal] = useState("");
   const [saving, setSaving] = useState(false);
+  const [alert, setAlert] = useState({ show: false, type: '', message: '', title: '' });
 
   useEffect(() => {
     // Carrega tarefas pendentes para o seletor
@@ -17,7 +19,35 @@ export function AddResultCard({ onDataChange }) {
 
   const handleSave = async () => {
     if (!total || !correct) {
-      alert("Por favor, preencha os acertos e o total de questões.");
+      setAlert({
+        show: true,
+        type: 'error',
+        title: 'Erro de Validação',
+        message: 'Por favor, preencha os acertos e o total de questões.'
+      });
+      return;
+    }
+
+    const correctNum = Number(correct);
+    const totalNum = Number(total);
+
+    if (correctNum > totalNum) {
+      setAlert({
+        show: true,
+        type: 'error',
+        title: 'Erro de Validação',
+        message: 'O número de acertos não pode ser maior que o total de questões.'
+      });
+      return;
+    }
+
+    if (correctNum < 0 || totalNum <= 0) {
+      setAlert({
+        show: true,
+        type: 'error',
+        title: 'Erro de Validação',
+        message: 'Os números devem ser positivos e o total deve ser maior que zero.'
+      });
       return;
     }
     setSaving(true);
@@ -30,7 +60,12 @@ export function AddResultCard({ onDataChange }) {
       // No backend, a coluna `discipline_id` na tabela `result` não é NOT NULL,
       // então podemos omiti-la e o backend a pegará da tarefa, se vinculada.
       const res = await api("/results", { method: "POST", body: JSON.stringify(payload) });
-      alert(`Resultado salvo com sucesso: ${res.percent.toFixed(1)}%`);
+      setAlert({
+        show: true,
+        type: 'success',
+        title: 'Sucesso',
+        message: `Resultado salvo com sucesso: ${res.percent.toFixed(1)}%`
+      });
       // Limpa o formulário e avisa o app principal para recarregar os dados
       setTaskId("");
       setCorrect("");
@@ -39,7 +74,12 @@ export function AddResultCard({ onDataChange }) {
         onDataChange();
       }
     } catch (e) {
-      alert(`Erro ao salvar resultado: ${e.message}`);
+      setAlert({
+        show: true,
+        type: 'error',
+        title: 'Erro ao Salvar',
+        message: e.message
+      });
     } finally {
       setSaving(false);
     }
@@ -47,6 +87,14 @@ export function AddResultCard({ onDataChange }) {
 
   return (
     <Card title="Adicionar Resultado de Questões" icon={<PlusCircle />}>
+      <AlertDialog
+        isOpen={alert.show}
+        onClose={() => setAlert({ ...alert, show: false })}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        confirmLabel="OK"
+      />
       {/* Usando a classe .result-form-grid que você já tem */}
       <div className="result-form-grid">
         {/* Cada item é envolvido por .form-group para ter o label e o espaçamento correto */}
@@ -60,12 +108,41 @@ export function AddResultCard({ onDataChange }) {
 
         <div className="form-group questions-input">
           <label>Acertos</label>
-          <Input type="number" value={correct} onChange={(e) => setCorrect(e.target.value)} placeholder="Ex: 25" />
+          <Input 
+            type="number" 
+            min="0"
+            value={correct} 
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value && Number(value) > Number(total)) {
+                setAlert({
+                  show: true,
+                  type: 'error',
+                  title: 'Erro de Validação',
+                  message: 'O número de acertos não pode ser maior que o total de questões.'
+                });
+                return;
+              }
+              setCorrect(value);
+            }} 
+            placeholder="Ex: 25" 
+          />
         </div>
         
         <div className="form-group questions-input">
           <label>Total de Questões</label>
-          <Input type="number" value={total} onChange={(e) => setTotal(e.target.value)} placeholder="Ex: 30" />
+          <Input 
+            type="number" 
+            min="1"
+            value={total} 
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value && Number(correct) > Number(value)) {
+                setCorrect(value); // Automatically adjust correct answers if they exceed new total
+              }
+              setTotal(value);
+            }} 
+            placeholder="Ex: 30" />
         </div>
         
         <div className="form-group">

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { api } from './api';
 import { Card, Button, Input, Select } from './components';
 import { ListChecks, PlusCircle, Edit, Trash2, Eye, ArrowLeft } from 'lucide-react';
+import { AlertDialog } from './AlertDialog';
 
 // --- Formulários para os Modais (AGORA EXPORTADOS) ---
 
@@ -20,6 +21,7 @@ export function DisciplineForm({ data, onSave, onCancel }) {
 function TopicsForDisciplineView({ discipline, onBack, onOpenModal, handleDeleteTopic }) {
     const [topics, setTopics] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [alert, setAlert] = useState({ show: false, type: '', message: '', title: '', onConfirm: null });
 
     // Este useEffect busca os tópicos APENAS para a disciplina selecionada
     useEffect(() => {
@@ -35,8 +37,31 @@ function TopicsForDisciplineView({ discipline, onBack, onOpenModal, handleDelete
         }
     }, [discipline.id]);
 
+    const confirmDelete = (topicId) => {
+        setAlert({
+            show: true,
+            type: 'confirm',
+            title: 'Confirmar Exclusão',
+            message: 'Tem certeza que deseja deletar este item? A ação não pode ser desfeita e deletará todos os dados associados.',
+            onConfirm: () => {
+                handleDeleteTopic(topicId);
+                setAlert({ ...alert, show: false });
+            }
+        });
+    };
+
     return (
         <div className="flex-container-col">
+            <AlertDialog
+                isOpen={alert.show}
+                onClose={() => setAlert({ ...alert, show: false })}
+                title={alert.title}
+                message={alert.message}
+                type={alert.type}
+                confirmLabel={alert.type === 'confirm' ? 'Excluir' : 'OK'}
+                cancelLabel={alert.type === 'confirm' ? 'Cancelar' : undefined}
+                onConfirm={alert.onConfirm}
+            />
             <Button variant="ghost" onClick={onBack} style={{ alignSelf: 'flex-start', marginBottom: '1rem' }}>
                 <ArrowLeft /> Voltar para Todas as Disciplinas
             </Button>
@@ -58,7 +83,7 @@ function TopicsForDisciplineView({ discipline, onBack, onOpenModal, handleDelete
                                         <span>{t.name}</span>
                                         <div>
                                             <Button variant="ghost" onClick={() => onOpenModal('topic', t)}><Edit /></Button>
-                                            <Button variant="danger" onClick={() => handleDeleteTopic(t.id)}><Trash2 /></Button>
+                                            <Button variant="danger" onClick={() => confirmDelete(t.id)}><Trash2 /></Button>
                                         </div>
                                     </li>
                                 ))}
@@ -85,7 +110,12 @@ export function TopicForm({ data, disciplines, onSave, onCancel }) {
   const handleSubmit = (e) => { 
     e.preventDefault();
     if (!disciplineId) {
-        alert("Por favor, selecione uma disciplina.");
+        setAlert({
+            show: true,
+            type: 'error',
+            title: 'Erro de Validação',
+            message: 'Por favor, selecione uma disciplina.'
+        });
         return;
     }
     onSave({ ...data, name, discipline_id: Number(disciplineId) }); 
@@ -185,6 +215,7 @@ export function ManagePage({ keyProp, onOpenModal }) {
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedDisciplineId, setSelectedDisciplineId] = useState(null);
+    const [alert, setAlert] = useState({ show: false, type: '', message: '', title: '', onConfirm: null });
 
     // A função de carregamento agora busca apenas o necessário para a tela principal
     const loadData = async () => {
@@ -204,19 +235,32 @@ export function ManagePage({ keyProp, onOpenModal }) {
     useEffect(() => { loadData(); }, [keyProp]);
 
       const handleDelete = async (type, id) => {
-        const endpoint = `${type}s`;
-        if (window.confirm(`Tem certeza que deseja deletar este item? A ação não pode ser desfeita e deletará todos os dados associados.`)) {
-            try {
-                await api(`/${endpoint}/${id}`, { method: 'DELETE' });
-                // Se um tópico for deletado na visão de tópicos, precisamos recarregar os dados aqui também
-                if (type === 'topic') {
-                    // Esta chamada não é ideal, mas para manter simples, vamos recarregar tudo
-                    loadData(); 
-                } else {
-                    loadData();
+        setAlert({
+            show: true,
+            type: 'confirm',
+            title: 'Confirmar Exclusão',
+            message: 'Tem certeza que deseja deletar este item? A ação não pode ser desfeita e deletará todos os dados associados.',
+            onConfirm: async () => {
+                try {
+                    const endpoint = `${type}s`;
+                    await api(`/${endpoint}/${id}`, { method: 'DELETE' });
+                    // Se um tópico for deletado na visão de tópicos, precisamos recarregar os dados aqui também
+                    if (type === 'topic') {
+                        // Esta chamada não é ideal, mas para manter simples, vamos recarregar tudo
+                        loadData(); 
+                    } else {
+                        loadData();
+                    }
+                } catch(e) {
+                    setAlert({
+                        show: true,
+                        type: 'error',
+                        title: 'Erro ao Excluir',
+                        message: e.message
+                    });
                 }
-            } catch(e) { alert(`Erro ao deletar: ${e.message}`) }
-        }
+            }
+        });
     };
     
     // Encontra o objeto completo da disciplina selecionada
@@ -240,6 +284,16 @@ export function ManagePage({ keyProp, onOpenModal }) {
     
     return (
         <div className="flex-container-col">
+            <AlertDialog
+                isOpen={alert.show}
+                onClose={() => setAlert({ ...alert, show: false })}
+                title={alert.title}
+                message={alert.message}
+                type={alert.type}
+                confirmLabel={alert.type === 'confirm' ? 'Excluir' : 'OK'}
+                cancelLabel={alert.type === 'confirm' ? 'Cancelar' : undefined}
+                onConfirm={alert.onConfirm}
+            />
             <Card title="Disciplinas" icon={<ListChecks />} action={<Button onClick={() => onOpenModal('discipline')}><PlusCircle /> Adicionar Disciplina</Button>}>
                 {disciplines.length > 0 ? (
                     <ul className="management-list">
