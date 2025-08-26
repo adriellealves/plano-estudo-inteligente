@@ -86,7 +86,7 @@ export function GoalsPage() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         // Enviar os dados diretamente sem conversão
         const adjustedData = {
             ...formData,
@@ -184,7 +184,7 @@ export function GoalsPage() {
                             <select
                                 required
                                 value={formData.discipline_id}
-                                onChange={e => setFormData({...formData, discipline_id: e.target.value})}
+                                onChange={e => setFormData({ ...formData, discipline_id: e.target.value })}
                             >
                                 <option value="">Selecione uma disciplina</option>
                                 {disciplines.map(d => (
@@ -198,7 +198,7 @@ export function GoalsPage() {
                             <select
                                 required
                                 value={formData.type}
-                                onChange={e => setFormData({...formData, type: e.target.value})}
+                                onChange={e => setFormData({ ...formData, type: e.target.value })}
                             >
                                 <option value="study_time">Tempo de Estudo</option>
                                 <option value="performance">Desempenho</option>
@@ -212,7 +212,7 @@ export function GoalsPage() {
                                 type="number"
                                 required
                                 value={formData.target_value}
-                                onChange={e => setFormData({...formData, target_value: e.target.value})}
+                                onChange={e => setFormData({ ...formData, target_value: e.target.value })}
                                 min="0"
                                 max={formData.type === 'performance' ? "100" : undefined}
                             />
@@ -223,7 +223,7 @@ export function GoalsPage() {
                             <select
                                 required
                                 value={formData.period}
-                                onChange={e => setFormData({...formData, period: e.target.value})}
+                                onChange={e => setFormData({ ...formData, period: e.target.value })}
                             >
                                 <option value="daily">Diária</option>
                                 <option value="weekly">Semanal</option>
@@ -232,27 +232,29 @@ export function GoalsPage() {
                             </select>
                         </div>
 
-                        <div className="form-group">
-                            <label>Data Inicial</label>
-                            <input
-                                type="date"
-                                required
-                                value={formData.start_date}
-                                onChange={e => setFormData({...formData, start_date: e.target.value})}
-                            />
-                        </div>
+                        <div className='form-dates'>
+                            <div className="form-group">
+                                <label>Data Inicial</label>
+                                <input
+                                    type="date"
+                                    required
+                                    value={formData.start_date}
+                                    onChange={e => setFormData({ ...formData, start_date: e.target.value })}
+                                />
+                            </div>
 
-                        <div className="form-group">
-                            <label>Data Final</label>
-                            <input
-                                type="date"
-                                required
-                                value={formData.end_date}
-                                onChange={e => setFormData({...formData, end_date: e.target.value})}
-                                min={formData.start_date}
-                            />
-                        </div>
+                            <div className="form-group">
+                                <label>Data Final</label>
+                                <input
+                                    type="date"
+                                    required
+                                    value={formData.end_date}
+                                    onChange={e => setFormData({ ...formData, end_date: e.target.value })}
+                                    min={formData.start_date}
+                                />
+                            </div>
 
+                        </div>
                         <div className="form-actions">
                             <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
                             <Button type="submit">Criar Meta</Button>
@@ -282,8 +284,8 @@ export function GoalsPage() {
                         const isAtRisk = !isCompleted && new Date(goal.end_date) < new Date();
 
                         return (
-                            <Card 
-                                key={goal.id} 
+                            <Card
+                                key={goal.id}
                                 title={`Meta: ${goal.discipline_name}`}
                                 icon={<Target />}
                             >
@@ -296,12 +298,12 @@ export function GoalsPage() {
                                         <div><strong>Início:</strong> {goal.start_date.split('-').reverse().join('/')}</div>
                                         <div><strong>Fim:</strong> {goal.end_date.split('-').reverse().join('/')}</div>
                                     </div>
-                                    
+
                                     <div className="goal-progress">
                                         <div className="progress-bar-container">
-                                            <div 
+                                            <div
                                                 className={`progress-bar ${isCompleted ? 'completed' : isAtRisk ? 'at-risk' : ''}`}
-                                                style={{width: `${progressPercent}%`}}
+                                                style={{ width: `${progressPercent}%` }}
                                             />
                                         </div>
                                         <div className="progress-label">{progressPercent}%</div>
@@ -311,7 +313,7 @@ export function GoalsPage() {
                                         <Button onClick={() => handleEdit(goal)} variant="ghost">
                                             <Edit size={16} />Editar
                                         </Button>
-                                        <Button 
+                                        <Button
                                             onClick={() => {
                                                 setAlert({
                                                     show: true,
@@ -335,7 +337,7 @@ export function GoalsPage() {
                                                         }
                                                     }
                                                 });
-                                            }} 
+                                            }}
                                             variant="ghost"
                                             style={{ color: 'var(--red-9)' }}
                                         >

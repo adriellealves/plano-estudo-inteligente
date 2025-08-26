@@ -19,7 +19,7 @@ export default function CoursesPage() {
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
-        gap: '24px 24px' 
+        gap: '3rem 1rem' 
       }}>
         {courses.map((course) => (
           <Card 
