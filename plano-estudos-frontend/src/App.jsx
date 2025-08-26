@@ -4,6 +4,7 @@ import CoursesPage from './CoursesPage';
 import { api } from './api';
 import { Button, Modal } from './components'; 
 import { DisciplineForm, TopicForm, TaskForm } from './ManagePage'; // Os forms agora vivem em ManagePage
+import { AlertDialog } from './AlertDialog';
 import { Dashboard } from './Dashboard';
 import { Tasks } from './Tasks';
 import { TimerPage } from './TimerPage';
@@ -21,6 +22,7 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [modal, setModal] = useState({ isOpen: false, type: null, data: null });
   const [disciplines, setDisciplines] = useState([]);
+  const [alert, setAlert] = useState({ show: false, type: '', message: '', title: '' });
   
   // Apenas a função stopTimer é necessária aqui para o alerta
   const { session } = useStudyTimer(); 
@@ -50,7 +52,14 @@ export default function App() {
       }
       setModal({ isOpen: false });
       handleSync();
-    } catch(e) { alert(`Erro ao salvar: ${e.message}`) }
+    } catch(e) {
+      setAlert({
+        show: true,
+        type: 'error',
+        title: 'Erro ao Salvar',
+        message: e.message
+      });
+    }
   };
 
   const tabs = [
@@ -95,6 +104,15 @@ export default function App() {
         {tab === "manage" && <ManagePage key={refreshKey} onOpenModal={handleOpenModal} />}
       </main>
       <footer className="footer">API Conectada</footer>
+
+      <AlertDialog
+        isOpen={alert.show}
+        onClose={() => setAlert({ ...alert, show: false })}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        confirmLabel="OK"
+      />
 
       <Modal isOpen={modal.isOpen} onClose={() => setModal({ isOpen: false })} title={`${modal.data?.id ? 'Editar' : 'Adicionar'} ${modal.type}`}>
           {modal.type === 'discipline' && <DisciplineForm data={modal.data} onSave={(d) => handleSave('discipline', d)} onCancel={() => setModal({isOpen: false})} />}

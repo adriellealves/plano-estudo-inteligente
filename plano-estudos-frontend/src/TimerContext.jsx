@@ -1,6 +1,7 @@
 // src/TimerContext.jsx
 import React, { createContext, useState, useEffect, useRef, useContext } from 'react';
 import { api } from './api';
+import { AlertDialog } from './AlertDialog';
 
 const SESSION_STORAGE_KEY = 'activeStudySession';
 const TimerContext = createContext();
@@ -9,6 +10,7 @@ export function TimerProvider({ children, onDataChange }) {
   const [session, setSession] = useState(null);
   const [elapsed, setElapsed] = useState("00:00:00");
   const timerRef = useRef(null);
+  const [alert, setAlert] = useState({ show: false, type: '', message: '', title: '' });
 
   useEffect(() => {
     const savedSession = sessionStorage.getItem(SESSION_STORAGE_KEY);
@@ -35,7 +37,12 @@ export function TimerProvider({ children, onDataChange }) {
 
   const startTimer = (taskId = null) => {
     if (session) {
-      alert("Já existe uma sessão de estudo em andamento.");
+      setAlert({
+        show: true,
+        type: 'error',
+        title: 'Sessão em Andamento',
+        message: 'Já existe uma sessão de estudo em andamento.'
+      });
       return;
     }
     const newSession = {
@@ -55,10 +62,20 @@ export function TimerProvider({ children, onDataChange }) {
 
     try {
       await api("/sessions/save", { method: "POST", body: JSON.stringify(payload) });
-      alert(`Sessão salva: ${duration} minutos`);
+      setAlert({
+        show: true,
+        type: 'success',
+        title: 'Sessão Salva',
+        message: `Sessão salva com sucesso: ${duration} minutos`
+      });
       if (onDataChange) onDataChange();
     } catch (e) {
-      alert(`Erro ao salvar sessão: ${e.message}`);
+      setAlert({
+        show: true,
+        type: 'error',
+        title: 'Erro ao Salvar',
+        message: e.message
+      });
     } finally {
       if (timerRef.current) clearInterval(timerRef.current);
       sessionStorage.removeItem(SESSION_STORAGE_KEY);
@@ -71,6 +88,14 @@ export function TimerProvider({ children, onDataChange }) {
 
   return (
     <TimerContext.Provider value={value}>
+      <AlertDialog
+        isOpen={alert.show}
+        onClose={() => setAlert({ ...alert, show: false })}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        confirmLabel="OK"
+      />
       {children}
     </TimerContext.Provider>
   );
