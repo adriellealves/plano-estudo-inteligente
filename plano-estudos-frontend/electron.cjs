@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs'); // ✅ Importe o módulo fs
@@ -136,6 +136,13 @@ function createWindow() {
       "Erro de Carregamento", 
       `Não foi possível carregar o aplicativo:\n\n${errorDescription}`
     );
+  });
+
+  // Intercepta links externos para abrir no navegador padrão
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // Abre URLs externas no navegador padrão do sistema
+    shell.openExternal(url);
+    return { action: 'deny' }; // Impede que o Electron abra uma nova janela
   });
 
   if (isDev) {
