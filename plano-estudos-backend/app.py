@@ -7,6 +7,7 @@ from flask_cors import CORS
 import os
 import sys
 import io
+import json
 
 # --- Bloco de Caminhos Corrigido ---
 # Determina o caminho base, seja rodando como script ou como executável
@@ -285,11 +286,70 @@ def save_session():
     data = request.get_json()
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # Inserir sessão
     cursor.execute('INSERT INTO study_session (task_id, start, "end", duration_minutes) VALUES (?, ?, ?, ?)',
                    (data.get('task_id'), data.get('start'), data.get('end'), data.get('duration_minutes')))
+    session_id = cursor.lastrowid
+    
+    # Buscar informações da tarefa e disciplina
+    task_info = conn.execute("""
+        SELECT t.id, t.title, d.id as discipline_id, d.name as discipline_name
+        FROM task t 
+        JOIN discipline d ON t.discipline_id = d.id 
+        WHERE t.id = ?
+    """, (data.get('task_id'),)).fetchone()
+    
+    if task_info:
+        task_dict = dict(task_info)
+        duration_hours = data.get('duration_minutes') / 60.0
+        
+        # Milestones de tempo de estudo (horas) por disciplina
+        study_time = conn.execute("""
+            SELECT SUM(s.duration_minutes) / 60.0 as total_hours
+            FROM study_session s
+            JOIN task t ON s.task_id = t.id
+            WHERE t.discipline_id = ?
+        """, (task_dict['discipline_id'],)).fetchone()['total_hours'] or 0
+        
+        hour_milestones = [5, 10, 25, 50, 100]
+        for milestone in hour_milestones:
+            if study_time >= milestone:
+                # Verifica se já existe notificação para este milestone
+                notification_exists = conn.execute("""
+                    SELECT 1 FROM notification 
+                    WHERE type = 'achievement' 
+                    AND title LIKE ? 
+                    AND related_id = ?
+                """, (f'%{milestone} horas%', task_dict['discipline_id'])).fetchone()
+                
+                if not notification_exists:
+                    create_achievement_notification(
+                        conn,
+                        f"{milestone} horas de estudo em {task_dict['discipline_name']}! ⏰",
+                        f"Você já dedicou {milestone} horas ao estudo desta disciplina. Continue assim!",
+                        task_dict['discipline_id'],
+                        'discipline'
+                    )
+        
+        # Sessão longa (mais de 2 horas)
+        if duration_hours >= 2:
+            create_achievement_notification(
+                conn,
+                "Sessão produtiva! 💪",
+                f"Você estudou {task_dict['discipline_name']} por {duration_hours:.1f} horas.",
+                session_id,
+                'study_session'
+            )
+    
     conn.commit()
     recalculate_evolution(conn)
-    return jsonify({"message": "Sessão salva com sucesso", "id": cursor.lastrowid}), 201
+    check_goals_status(conn)  # Verifica se alguma meta foi alcançada
+    
+    return jsonify({
+        "message": "Sessão salva com sucesso", 
+        "id": session_id
+    }), 201
 
 @app.route('/api/sessions/history', methods=['GET'])
 def get_session_history():
@@ -309,10 +369,63 @@ def add_result():
     conn = get_db_connection()
     percent = (data['correct'] / data['total']) * 100 if data['total'] > 0 else 0
     cursor = conn.cursor()
+    
+    # Inserir resultado
     cursor.execute('INSERT INTO result (task_id, correct, total, percent, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)',
                    (data.get('task_id'), data['correct'], data['total'], percent))
+    
+    # Buscar informações da tarefa
+    task_info = conn.execute("""
+        SELECT t.id, t.title, d.id as discipline_id, d.name as discipline_name
+        FROM task t 
+        JOIN discipline d ON t.discipline_id = d.id 
+        WHERE t.id = ?
+    """, (data.get('task_id'),)).fetchone()
+    
+    if task_info:
+        task_dict = dict(task_info)
+        
+        # Cálculo de média recente para a disciplina
+        recent_avg = conn.execute("""
+            SELECT AVG(r.percent) as avg_performance
+            FROM result r
+            JOIN task t ON r.task_id = t.id
+            WHERE t.discipline_id = ?
+            AND r.created_at >= date('now', '-7 days')
+        """, (task_dict['discipline_id'],)).fetchone()['avg_performance']
+        
+        # Notificações baseadas no desempenho
+        if percent >= 80:
+            create_performance_notification(
+                conn,
+                f"Excelente resultado em {task_dict['discipline_name']}! 🌟",
+                f"Você acertou {percent:.1f}% dos exercícios em {task_dict['title']}.",
+                'normal',
+                task_dict['discipline_id'],
+                'discipline'
+            )
+        elif percent < 60:
+            create_performance_notification(
+                conn,
+                f"Atenção ao resultado em {task_dict['discipline_name']}",
+                f"Você acertou {percent:.1f}% dos exercícios em {task_dict['title']}. Considere revisar o conteúdo.",
+                'high',
+                task_dict['discipline_id'],
+                'discipline'
+            )
+        
+        # Se houve uma melhoria significativa na média
+        if recent_avg and recent_avg < 60 and percent >= 80:
+            create_achievement_notification(
+                conn,
+                "Melhoria significativa! 📈",
+                f"Seu desempenho em {task_dict['discipline_name']} melhorou muito! Continue assim!"
+            )
+    
     conn.commit()
     recalculate_evolution(conn)
+    check_performance_alerts(conn)
+    
     return jsonify({"message": "Resultado salvo", "percent": percent})
 
 @app.route('/api/reviews', methods=['GET'])
@@ -341,6 +454,308 @@ def get_evolution():
     data = conn.execute("SELECT d.name as discipline_name, e.* FROM evolution e JOIN discipline d ON e.discipline_id = d.id").fetchall()
     return jsonify([dict(row) for row in data])
 
+@app.route('/api/notifications', methods=['GET'])
+def get_notifications():
+    conn = get_db_connection()
+    notifications = conn.execute("""
+        SELECT * FROM notification
+        WHERE read_at IS NULL
+        ORDER BY created_at DESC
+    """).fetchall()
+    return jsonify([dict(row) for row in notifications])
+
+@app.route('/api/notifications/mark-read', methods=['POST'])
+def mark_notifications_read():
+    conn = get_db_connection()
+    data = request.get_json()
+    notification_ids = data.get('ids', [])
+    
+    if notification_ids:
+        placeholders = ','.join('?' * len(notification_ids))
+        conn.execute(
+            f"UPDATE notification SET read_at = CURRENT_TIMESTAMP WHERE id IN ({placeholders})",
+            notification_ids
+        )
+        conn.commit()
+    
+    return jsonify({"message": "Notificações marcadas como lidas"})
+
+@app.route('/api/topics/performance', methods=['GET'])
+def get_topics_performance():
+    conn = get_db_connection()
+    # Busca performance por tópico
+    topics_data = conn.execute("""
+        WITH TopicResults AS (
+            SELECT 
+                t.id as topic_id,
+                t.name as topic_name,
+                t.discipline_id,
+                d.name as discipline_name,
+                SUM(r.correct) as total_correct,
+                SUM(r.total) as total_questions,
+                COUNT(DISTINCT tt.task_id) as total_tasks,
+                ROUND(AVG(r.percent), 2) as avg_performance
+            FROM topic t
+            JOIN discipline d ON t.discipline_id = d.id
+            LEFT JOIN task_topics tt ON t.id = tt.topic_id
+            LEFT JOIN task tk ON tt.task_id = tk.id
+            LEFT JOIN result r ON tk.id = r.task_id
+            GROUP BY t.id, t.name, t.discipline_id, d.name
+        )
+        SELECT 
+            *,
+            CASE 
+                WHEN avg_performance >= 80 THEN 'strong'
+                WHEN avg_performance >= 60 THEN 'medium'
+                ELSE 'weak'
+            END as performance_level
+        FROM TopicResults
+        ORDER BY discipline_name, avg_performance DESC
+    """).fetchall()
+
+    # Organizar dados por disciplina
+    disciplines_map = {}
+    for topic in topics_data:
+        topic_dict = dict(topic)
+        discipline_id = topic_dict['discipline_id']
+        
+        if discipline_id not in disciplines_map:
+            disciplines_map[discipline_id] = {
+                'name': topic_dict['discipline_name'],
+                'topics': []
+            }
+        
+        # Adicionar tópico à disciplina
+        disciplines_map[discipline_id]['topics'].append({
+            'id': topic_dict['topic_id'],
+            'name': topic_dict['topic_name'],
+            'totalCorrect': topic_dict['total_correct'] or 0,
+            'totalQuestions': topic_dict['total_questions'] or 0,
+            'totalTasks': topic_dict['total_tasks'] or 0,
+            'avgPerformance': topic_dict['avg_performance'] or 0,
+            'performanceLevel': topic_dict['performance_level']
+        })
+    
+    # Converter para lista
+    result = [
+        {
+            'discipline_id': k,
+            'discipline_name': v['name'],
+            'topics': sorted(v['topics'], key=lambda x: x['avgPerformance'], reverse=True)
+        }
+        for k, v in disciplines_map.items()
+    ]
+    
+    return jsonify(result)
+
+@app.route('/api/goals', methods=['GET', 'POST'])
+def handle_goals():
+    conn = get_db_connection()
+    if request.method == 'GET':
+        status = request.args.get('status', 'active')
+        goals = conn.execute("""
+            SELECT g.*, d.name as discipline_name 
+            FROM study_goal g 
+            JOIN discipline d ON g.discipline_id = d.id
+            WHERE g.status = ?
+            ORDER BY g.end_date ASC
+        """, (status,)).fetchall()
+        return jsonify([dict(row) for row in goals])
+    
+    if request.method == 'POST':
+        data = request.get_json()
+        required_fields = ['discipline_id', 'type', 'target_value', 'period', 'start_date', 'end_date']
+        if not all(field in data for field in required_fields):
+            return jsonify({"error": "Todos os campos são obrigatórios"}), 400
+        
+        # Garante que as datas estejam com o dia correto
+        start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
+        end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date()
+        
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO study_goal (discipline_id, type, target_value, period, start_date, end_date)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            data['discipline_id'],
+            data['type'],
+            data['target_value'],
+            data['period'],
+            start_date.isoformat(),  # Usa apenas a data, sem informação de hora
+            end_date.isoformat()     # Usa apenas a data, sem informação de hora
+        ))
+        conn.commit()
+        
+        new_goal = conn.execute("""
+            SELECT g.*, d.name as discipline_name 
+            FROM study_goal g 
+            JOIN discipline d ON g.discipline_id = d.id
+            WHERE g.id = ?
+        """, (cursor.lastrowid,)).fetchone()
+        
+        return jsonify(dict(new_goal)), 201
+
+@app.route('/api/goals/<int:goal_id>', methods=['PUT', 'DELETE'])
+def handle_goal(goal_id):
+    conn = get_db_connection()
+    if request.method == 'PUT':
+        data = request.get_json()
+        cursor = conn.cursor()
+        
+        if 'status' in data:
+            # Atualização apenas do status
+            cursor.execute("""
+                UPDATE study_goal 
+                SET status = ?
+                WHERE id = ?
+            """, (data['status'], goal_id))
+        else:
+            # Garante que as datas estejam em UTC
+            start_date = datetime.strptime(data['start_date'], '%Y-%m-%d')
+            end_date = datetime.strptime(data['end_date'], '%Y-%m-%d')
+            
+            # Atualização completa da meta
+            cursor.execute("""
+                UPDATE study_goal 
+                SET discipline_id = ?, type = ?, target_value = ?, 
+                    period = ?, start_date = ?, end_date = ?
+                WHERE id = ?
+            """, (
+                data['discipline_id'], data['type'], data['target_value'],
+                data['period'], 
+                start_date.strftime('%Y-%m-%d'),
+                end_date.strftime('%Y-%m-%d'),
+                goal_id
+            ))
+        
+        conn.commit()
+        
+        updated_goal = conn.execute("""
+            SELECT g.*, d.name as discipline_name 
+            FROM study_goal g 
+            JOIN discipline d ON g.discipline_id = d.id
+            WHERE g.id = ?
+        """, (goal_id,)).fetchone()
+        return jsonify(dict(updated_goal))
+    
+    if request.method == 'DELETE':
+        conn.execute('DELETE FROM study_goal WHERE id = ?', (goal_id,))
+        conn.commit()
+        return jsonify({"message": "Meta removida com sucesso"})
+
+@app.route('/api/notifications/check', methods=['POST'])
+def check_for_notifications():
+    """Endpoint para forçar uma verificação de notificações"""
+    check_notifications()
+    return jsonify({"message": "Notificações verificadas com sucesso"})
+
+@app.route('/api/goals/progress', methods=['GET'])
+def get_goals_progress():
+    conn = get_db_connection()
+    goals = conn.execute("""
+        SELECT g.*, d.name as discipline_name 
+        FROM study_goal g 
+        JOIN discipline d ON g.discipline_id = d.id
+        WHERE g.status = 'active'
+    """).fetchall()
+    
+    progress_data = []
+    for goal in goals:
+        goal_dict = dict(goal)
+        
+        if goal['type'] == 'study_time':
+            # Calcula progresso do tempo de estudo
+            progress = conn.execute("""
+                SELECT COALESCE(SUM(duration_minutes), 0) as total_minutes
+                FROM study_session s
+                JOIN task t ON s.task_id = t.id
+                WHERE t.discipline_id = ?
+                AND date(s.start) >= ?
+                AND date(s.start) <= ?
+            """, (goal['discipline_id'], goal['start_date'], goal['end_date'])).fetchone()
+            
+            goal_dict['current_value'] = progress['total_minutes']
+            
+        elif goal['type'] == 'performance':
+            # Calcula média de desempenho
+            progress = conn.execute("""
+                SELECT AVG(r.percent) as avg_performance
+                FROM result r
+                JOIN task t ON r.task_id = t.id
+                WHERE t.discipline_id = ?
+                AND date(r.created_at) >= ?
+                AND date(r.created_at) <= ?
+            """, (goal['discipline_id'], goal['start_date'], goal['end_date'])).fetchone()
+            
+            goal_dict['current_value'] = progress['avg_performance'] or 0
+            
+        elif goal['type'] == 'exercises_completed':
+            # Calcula total de exercícios
+            progress = conn.execute("""
+                SELECT COALESCE(SUM(r.total), 0) as total_exercises
+                FROM result r
+                JOIN task t ON r.task_id = t.id
+                WHERE t.discipline_id = ?
+                AND date(r.created_at) >= ?
+                AND date(r.created_at) <= ?
+            """, (goal['discipline_id'], goal['start_date'], goal['end_date'])).fetchone()
+            
+            goal_dict['current_value'] = progress['total_exercises']
+        
+        goal_dict['progress_percent'] = (goal_dict['current_value'] / goal['target_value']) * 100
+        
+        # Se a meta foi alcançada, atualiza o status
+        if goal_dict['progress_percent'] >= 100 and goal_dict['status'] == 'active':
+            conn.execute("UPDATE study_goal SET status = 'completed' WHERE id = ?", (goal_dict['id'],))
+            conn.commit()
+            
+            # Criar notificação de conquista
+            create_goal_notification(
+                conn,
+                f"Meta alcançada em {goal_dict['discipline_name']}! 🎉",
+                f"Você alcançou a meta de {goal_dict['target_value']} {goal_dict['type']}!",
+                'normal',
+                goal_dict['id']
+            )
+        
+        progress_data.append(goal_dict)
+    
+    return jsonify(progress_data)
+
+@app.route('/api/performance/history', methods=['GET'])
+def get_performance_history():
+    conn = get_db_connection()
+    days = request.args.get('days', default=30, type=int)
+    discipline_id = request.args.get('discipline_id', type=int)
+    
+    query = """
+        SELECT 
+            d.name as discipline_name,
+            ph.*,
+            ROUND(CAST(ph.correct_answers AS FLOAT) / NULLIF(ph.exercises_completed, 0) * 100, 2) as accuracy
+        FROM performance_history ph
+        JOIN discipline d ON ph.discipline_id = d.id
+        WHERE ph.date >= date('now', ?)
+    """
+    params = [f'-{days} days']
+    
+    if discipline_id:
+        query += " AND ph.discipline_id = ?"
+        params.append(discipline_id)
+    
+    query += " ORDER BY ph.date"
+    
+    data = conn.execute(query, params).fetchall()
+    return jsonify([dict(row) for row in data])
+
+@app.route('/api/courses', methods=['GET'])
+def get_courses():
+    try:
+        with open(os.path.join(base_path, 'course_links.json')) as f:
+            return jsonify(json.load(f))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/sync', methods=['POST'])
 def sync_from_spreadsheet():
     try:
@@ -366,6 +781,44 @@ def create_tables(conn):
     cursor.execute("CREATE TABLE IF NOT EXISTS trilha (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)")
     cursor.execute("""CREATE TABLE IF NOT EXISTS topic (id INTEGER PRIMARY KEY, name TEXT NOT NULL,
                    discipline_id INTEGER NOT NULL, FOREIGN KEY (discipline_id) REFERENCES discipline (id) ON DELETE CASCADE)""")
+    cursor.execute("""CREATE TABLE IF NOT EXISTS notification (
+        id INTEGER PRIMARY KEY,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        read_at DATETIME,
+        priority TEXT DEFAULT 'normal',
+        related_id INTEGER,
+        related_type TEXT,
+        CHECK (type IN ('goal', 'review', 'performance', 'achievement')),
+        CHECK (priority IN ('low', 'normal', 'high'))
+    )""")
+    cursor.execute("""CREATE TABLE IF NOT EXISTS study_goal (
+        id INTEGER PRIMARY KEY,
+        discipline_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        target_value REAL NOT NULL,
+        period TEXT NOT NULL,
+        start_date DATE NOT NULL,
+        end_date DATE NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        status TEXT DEFAULT 'active',
+        FOREIGN KEY (discipline_id) REFERENCES discipline (id) ON DELETE CASCADE,
+        CHECK (type IN ('study_time', 'performance', 'exercises_completed')),
+        CHECK (period IN ('daily', 'weekly', 'monthly', 'custom')),
+        CHECK (status IN ('active', 'completed', 'failed', 'cancelled'))
+    )""")
+    cursor.execute("""CREATE TABLE IF NOT EXISTS performance_history (
+        id INTEGER PRIMARY KEY,
+        discipline_id INTEGER NOT NULL,
+        date DATE NOT NULL,
+        exercises_completed INTEGER DEFAULT 0,
+        correct_answers INTEGER DEFAULT 0,
+        study_time_minutes INTEGER DEFAULT 0,
+        performance_percent REAL DEFAULT 0,
+        FOREIGN KEY (discipline_id) REFERENCES discipline (id) ON DELETE CASCADE
+    )""")
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS task (
         id INTEGER PRIMARY KEY, spreadsheet_task_id REAL UNIQUE, title TEXT, discipline_id INTEGER,
@@ -459,6 +912,68 @@ def import_ciclo_from_excel(conn):
 
 def recalculate_evolution(conn):
     print("Iniciando recálculo da tabela de evolução...")
+    
+    # Query para resultados diários
+    daily_results_query = """
+        SELECT 
+            t.discipline_id,
+            d.name as discipline_name,
+            date(r.created_at) as date,
+            SUM(r.total) as exercises_completed,
+            SUM(r.correct) as correct_answers
+        FROM task t 
+        JOIN discipline d ON t.discipline_id = d.id 
+        JOIN result r ON t.id = r.task_id
+        GROUP BY t.discipline_id, date(r.created_at)
+    """
+    
+    # Query para tempo de estudo diário
+    daily_study_query = """
+        SELECT 
+            t.discipline_id,
+            date(s.start) as date,
+            SUM(s.duration_minutes) as study_time_minutes
+        FROM task t 
+        JOIN study_session s ON t.id = s.task_id
+        GROUP BY t.discipline_id, date(s.start)
+    """
+    
+    # Carregar dados
+    df_daily_results = pd.read_sql_query(daily_results_query, conn)
+    df_daily_study = pd.read_sql_query(daily_study_query, conn)
+    
+    # Mesclar dados de resultados e tempo de estudo
+    if not df_daily_results.empty:
+        # Processar dados diários
+        for _, row in df_daily_results.iterrows():
+            # Buscar tempo de estudo correspondente
+            study_time = 0
+            if not df_daily_study.empty:
+                matching_study = df_daily_study[
+                    (df_daily_study['discipline_id'] == row['discipline_id']) &
+                    (df_daily_study['date'] == row['date'])
+                ]
+                if not matching_study.empty:
+                    study_time = matching_study.iloc[0]['study_time_minutes']
+            
+            # Calcular performance
+            performance = (row['correct_answers'] / row['exercises_completed'] * 100) if row['exercises_completed'] > 0 else 0
+            
+            # Inserir ou atualizar histórico
+            conn.execute("""
+                INSERT OR REPLACE INTO performance_history 
+                (discipline_id, date, exercises_completed, correct_answers, study_time_minutes, performance_percent)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                row['discipline_id'],
+                row['date'],
+                row['exercises_completed'],
+                row['correct_answers'],
+                study_time,
+                performance
+            ))
+    
+    # Continuar com o cálculo normal de evolução
     tasks_results_query = "SELECT t.discipline_id, d.name as discipline_name, r.total, r.correct FROM task t JOIN discipline d ON t.discipline_id = d.id LEFT JOIN result r ON t.id = r.task_id"
     df_tasks = pd.read_sql_query(tasks_results_query, conn)
     study_time_query = """
@@ -508,7 +1023,328 @@ def serve(path):
 with app.app_context():
     create_tables(get_db_connection())
 
+def create_achievement_notification(conn, title, message, related_id=None, related_type=None):
+    """Cria uma notificação de conquista"""
+    conn.execute("""
+        INSERT INTO notification (type, title, message, priority, related_id, related_type)
+        VALUES ('achievement', ?, ?, 'normal', ?, ?)
+    """, (title, message, related_id, related_type))
+    conn.commit()
+
+def create_goal_notification(conn, title, message, priority='normal', related_id=None):
+    """Cria uma notificação relacionada a uma meta"""
+    conn.execute("""
+        INSERT INTO notification (type, title, message, priority, related_id, related_type)
+        VALUES ('goal', ?, ?, ?, ?, 'goal')
+    """, (title, message, priority, related_id))
+    conn.commit()
+
+def create_performance_notification(conn, title, message, priority='normal', related_id=None, related_type=None):
+    """Cria uma notificação relacionada ao desempenho"""
+    conn.execute("""
+        INSERT INTO notification (type, title, message, priority, related_id, related_type)
+        VALUES ('performance', ?, ?, ?, ?, ?)
+    """, (title, message, priority, related_id, related_type))
+    conn.commit()
+
+def check_goals_status(conn):
+    """
+    Verifica o status das metas e gera notificações relevantes
+    - Metas próximas do fim (3 dias)
+    - Metas vencidas
+    - Metas concluídas
+    """
+    
+    # Buscar metas ativas
+    goals = conn.execute("""
+        SELECT g.*, d.name as discipline_name 
+        FROM study_goal g 
+        JOIN discipline d ON g.discipline_id = d.id
+        WHERE g.status = 'active'
+    """).fetchall()
+    
+    for goal in goals:
+        goal_dict = dict(goal)
+        
+        # Verificar metas vencidas
+        end_date = datetime.strptime(goal_dict['end_date'], '%Y-%m-%d').date()
+        today = datetime.now().date()
+        
+        if end_date < today:
+            # Marcar meta como falha
+            conn.execute("UPDATE study_goal SET status = 'failed' WHERE id = ?", (goal_dict['id'],))
+            
+            create_goal_notification(
+                conn,
+                f"Meta não alcançada em {goal_dict['discipline_name']}",
+                f"A meta de {goal_dict['target_value']} {goal_dict['type']} não foi alcançada no prazo.",
+                'high',
+                goal_dict['id']
+            )
+            continue
+        
+        # Verificar metas próximas do fim (3 dias)
+        days_remaining = (end_date - today).days
+        if days_remaining <= 3:
+            # Buscar progresso atual
+            if goal_dict['type'] == 'study_time':
+                progress = conn.execute("""
+                    SELECT COALESCE(SUM(duration_minutes), 0) as total_minutes
+                    FROM study_session s
+                    JOIN task t ON s.task_id = t.id
+                    WHERE t.discipline_id = ?
+                    AND date(s.start) >= ?
+                    AND date(s.start) <= ?
+                """, (goal_dict['discipline_id'], goal_dict['start_date'], goal_dict['end_date'])).fetchone()
+                
+                current_value = progress['total_minutes']
+                
+            elif goal_dict['type'] == 'performance':
+                progress = conn.execute("""
+                    SELECT AVG(r.percent) as avg_performance
+                    FROM result r
+                    JOIN task t ON r.task_id = t.id
+                    WHERE t.discipline_id = ?
+                    AND date(r.created_at) >= ?
+                    AND date(r.created_at) <= ?
+                """, (goal_dict['discipline_id'], goal_dict['start_date'], goal_dict['end_date'])).fetchone()
+                
+                current_value = progress['avg_performance'] or 0
+                
+            elif goal_dict['type'] == 'exercises_completed':
+                progress = conn.execute("""
+                    SELECT COALESCE(SUM(r.total), 0) as total_exercises
+                    FROM result r
+                    JOIN task t ON r.task_id = t.id
+                    WHERE t.discipline_id = ?
+                    AND date(r.created_at) >= ?
+                    AND date(r.created_at) <= ?
+                """, (goal_dict['discipline_id'], goal_dict['start_date'], goal_dict['end_date'])).fetchone()
+                
+                current_value = progress['total_exercises']
+            
+            progress_percent = (current_value / goal_dict['target_value']) * 100
+            
+            # Se meta já foi alcançada
+            if progress_percent >= 100:
+                conn.execute("UPDATE study_goal SET status = 'completed' WHERE id = ?", (goal_dict['id'],))
+                create_goal_notification(
+                    conn,
+                    f"Meta alcançada em {goal_dict['discipline_name']}! 🎉",
+                    f"Você alcançou a meta de {goal_dict['target_value']} {goal_dict['type']}!",
+                    'normal',
+                    goal_dict['id']
+                )
+            else:
+                remaining = goal_dict['target_value'] - current_value
+                create_goal_notification(
+                    conn,
+                    f"Meta próxima do fim em {goal_dict['discipline_name']}",
+                    f"Faltam {remaining:.0f} {goal_dict['type']} e {days_remaining} dias para alcançar sua meta.",
+                    'high' if days_remaining <= 1 else 'normal',
+                    goal_dict['id']
+                )
+
+def check_performance_alerts(conn):
+    """
+    Gera alertas baseados no desempenho:
+    - Queda de desempenho (abaixo de 60%)
+    - Melhoria significativa (acima de 80%)
+    - Recomendações de revisão para tópicos fracos
+    """
+    
+    # Buscar desempenho médio por disciplina nos últimos 30 dias
+    performances = conn.execute("""
+        SELECT 
+            d.id as discipline_id,
+            d.name as discipline_name,
+            AVG(r.percent) as avg_performance,
+            COUNT(r.id) as total_results
+        FROM discipline d
+        LEFT JOIN task t ON t.discipline_id = d.id
+        LEFT JOIN result r ON r.task_id = t.id
+        WHERE r.created_at >= date('now', '-30 days')
+        GROUP BY d.id, d.name
+        HAVING COUNT(r.id) > 0
+    """).fetchall()
+    
+    for perf in performances:
+        perf_dict = dict(perf)
+        
+        # Alerta de baixo desempenho
+        if perf_dict['avg_performance'] < 60:
+            create_performance_notification(
+                conn,
+                f"Atenção ao desempenho em {perf_dict['discipline_name']}",
+                f"Seu desempenho médio está em {perf_dict['avg_performance']:.1f}%. Considere revisar o conteúdo.",
+                'high',
+                perf_dict['discipline_id'],
+                'discipline'
+            )
+        
+        # Reconhecimento de alto desempenho
+        elif perf_dict['avg_performance'] > 80:
+            create_performance_notification(
+                conn,
+                f"Excelente desempenho em {perf_dict['discipline_name']}! 🌟",
+                f"Seu desempenho médio está em {perf_dict['avg_performance']:.1f}%. Continue assim!",
+                'normal',
+                perf_dict['discipline_id'],
+                'discipline'
+            )
+    
+    # Verificar tópicos com baixo desempenho
+    weak_topics = conn.execute("""
+        WITH TopicPerformance AS (
+            SELECT 
+                t.id as topic_id,
+                t.name as topic_name,
+                d.id as discipline_id,
+                d.name as discipline_name,
+                AVG(r.percent) as avg_performance,
+                COUNT(r.id) as total_results
+            FROM topic t
+            JOIN discipline d ON t.discipline_id = d.id
+            JOIN task_topics tt ON t.id = tt.topic_id
+            JOIN task tk ON tt.task_id = tk.id
+            JOIN result r ON tk.id = r.task_id
+            WHERE r.created_at >= date('now', '-30 days')
+            GROUP BY t.id, t.name, d.id, d.name
+            HAVING COUNT(r.id) >= 3
+        )
+        SELECT *
+        FROM TopicPerformance
+        WHERE avg_performance < 60
+    """).fetchall()
+    
+    for topic in weak_topics:
+        topic_dict = dict(topic)
+        create_performance_notification(
+            conn,
+            f"Tópico precisa de atenção: {topic_dict['topic_name']}",
+            f"Seu desempenho neste tópico está em {topic_dict['avg_performance']:.1f}%. Recomendamos revisar o conteúdo.",
+            'high',
+            topic_dict['topic_id'],
+            'topic'
+        )
+
+def monitor_achievements(conn):
+    """Monitora e cria notificações para conquistas do usuário"""
+    
+    # Conquista: Primeira meta concluída
+    first_goal = conn.execute("""
+        SELECT g.*, d.name as discipline_name
+        FROM study_goal g
+        JOIN discipline d ON g.discipline_id = d.id
+        WHERE g.status = 'completed'
+        ORDER BY g.end_date ASC
+        LIMIT 1
+    """).fetchone()
+    
+    if first_goal:
+        # Verifica se já existe notificação para esta conquista
+        notification_exists = conn.execute("""
+            SELECT 1 FROM notification 
+            WHERE type = 'achievement' 
+            AND title LIKE '%Primeira meta%'
+            AND related_id = ?
+        """, (first_goal['id'],)).fetchone()
+        
+        if not notification_exists:
+            create_achievement_notification(
+                conn,
+                "Primeira meta concluída! 🎯",
+                f"Parabéns! Você completou sua primeira meta em {dict(first_goal)['discipline_name']}.",
+                first_goal['id'],
+                'goal'
+            )
+    
+    # Conquista: 100 exercícios resolvidos
+    exercises_count = conn.execute("""
+        SELECT COUNT(*) as total
+        FROM result
+    """).fetchone()['total']
+    
+    milestones = [100, 500, 1000, 5000]
+    for milestone in milestones:
+        if exercises_count >= milestone:
+            notification_exists = conn.execute("""
+                SELECT 1 FROM notification 
+                WHERE type = 'achievement' 
+                AND title LIKE ?
+            """, (f'%{milestone} exercícios%',)).fetchone()
+            
+            if not notification_exists:
+                create_achievement_notification(
+                    conn,
+                    f"{milestone} exercícios resolvidos! 📚",
+                    "Você está no caminho certo! Continue praticando."
+                )
+    
+    # Conquista: Sequência de alto desempenho (3 resultados seguidos acima de 80%)
+    high_performance_streak = conn.execute("""
+        WITH RankedResults AS (
+            SELECT 
+                r.id,
+                r.percent,
+                ROW_NUMBER() OVER (ORDER BY r.created_at DESC) as recent_rank
+            FROM result r
+            WHERE r.percent >= 80
+            ORDER BY r.created_at DESC
+            LIMIT 3
+        )
+        SELECT COUNT(*) as streak
+        FROM RankedResults
+    """).fetchone()['streak']
+    
+    if high_performance_streak >= 3:
+        # Verifica se já existe notificação recente (últimos 7 dias) para esta conquista
+        notification_exists = conn.execute("""
+            SELECT 1 FROM notification 
+            WHERE type = 'achievement' 
+            AND title LIKE '%Sequência de alto desempenho%'
+            AND created_at >= date('now', '-7 days')
+        """).fetchone()
+        
+        if not notification_exists:
+            create_achievement_notification(
+                conn,
+                "Sequência de alto desempenho! 🔥",
+                "Você manteve um desempenho acima de 80% nas últimas 3 avaliações!"
+            )
+    
+    # Conquista: 10 horas de estudo
+    study_hours = conn.execute("""
+        SELECT SUM(duration_minutes) / 60.0 as total_hours
+        FROM study_session
+    """).fetchone()['total_hours'] or 0
+    
+    hour_milestones = [10, 50, 100, 500]
+    for milestone in hour_milestones:
+        if study_hours >= milestone:
+            notification_exists = conn.execute("""
+                SELECT 1 FROM notification 
+                WHERE type = 'achievement' 
+                AND title LIKE ?
+            """, (f'%{milestone} horas%',)).fetchone()
+            
+            if not notification_exists:
+                create_achievement_notification(
+                    conn,
+                    f"{milestone} horas de estudo! ⏰",
+                    "Seu comprometimento está rendendo frutos. Continue dedicado!"
+                )
+
+def check_notifications():
+    """Verifica e gera todas as notificações necessárias"""
+    conn = get_db_connection()
+    check_goals_status(conn)
+    check_performance_alerts(conn)
+    monitor_achievements(conn)
+
+# --- Inicialização ---
 if __name__ == '__main__':
     print("Backend Flask INICIADO com sucesso!")
+    check_notifications()  # Verifica notificações ao iniciar
     # Garante que o servidor Flask rode na porta 5000, como esperado pelo script 'electron:dev'
     app.run(debug=True, port=5000)
